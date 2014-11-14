@@ -1,0 +1,5 @@
+[package]
+
+name = "rustos5"
+version = "0.0.1"
+authors = ["Philipp Oppermann <philipp.oppermann@student.kit.edu>"]
