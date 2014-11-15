@@ -1,2 +1,6 @@
 /target
 /Cargo.lock
+/bin
+/isofiles/boot/os.bin
+rustos5.sublime-workspace
+os.iso

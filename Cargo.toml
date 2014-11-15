@@ -3,3 +3,13 @@
 name = "rustos5"
 version = "0.0.1"
 authors = ["Philipp Oppermann <philipp.oppermann@student.kit.edu>"]
+
+[lib]
+name = "rustos5"
+crate-type = ["staticlib"]
+
+[dependencies.rlibc]
+git = "https://github.com/rust-lang/rlibc.git"
+
+[dependencies.os_std]
+git = "https://PhilippOppermann@bitbucket.org/PhilippOppermann/os_std.git"
