@@ -53,6 +53,7 @@ _start:
     or eax, 1
     mov [P3], eax
 
+.identity_map:
     ;identity map first 8MB (rw)
 
     mov eax, P1_0
@@ -85,11 +86,13 @@ _start:
     mov dword [P1_0], 0
     mov dword [P1_0 + 4], 0
 
+recursive_map:
     ;recursive map p4
     mov eax, P4
     or eax, 1
     mov [P4 + 511*8], eax
- 
+
+enable_paging:
     ; Load CR3 with P4
     mov eax, P4
     mov cr3, eax
@@ -183,6 +186,7 @@ _start:
     extern idt_pointer
     lidt [idt_pointer]
 
+.startKernel:
     ;set stack limit (20 * 1024 red zone + 1024 just to be safe :))
     ;see http://doc.rust-lang.org/rustrt/stack/ + src
     mov qword [fs:0x70], StackBottom + 0x6000
