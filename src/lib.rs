@@ -12,10 +12,9 @@ mod init;
 pub fn main(multiboot: *const multiboot::Information) {
 
     unsafe{init::frame_stack(multiboot)};
-    
+
     unsafe{asm!("sti")};
     let x = box 5i;
-    panic!();
 
     let y = 0xb8000 as *mut u64;
     unsafe{*y = 0xffffffffffffffff};
