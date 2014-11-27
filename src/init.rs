@@ -14,11 +14,12 @@ struct FrameStack {
 }
 
 const PAGE_SIZE: u64 = 4096;
-const frame_stack_address : u64 = 10*1024*1024; //10MB
+const FRAME_STACK : *const FrameStack = (10*1024*1024 as uint) as *const FrameStack; //10MB
 
 pub unsafe fn frame_stack(multiboot: *const ::multiboot::Information) {
 
     let kernel_end = (&kernel_end_symbol_table_entry as *const ()) as *const FrameStack;
+    assert!(kernel_end < FRAME_STACK);
 
     let mut areas = (*multiboot).memory_areas().unwrap();    
     let maximal_phys_addr = areas.clone().fold(0, |max, area| {
@@ -26,11 +27,11 @@ pub unsafe fn frame_stack(multiboot: *const ::multiboot::Information) {
                     area.base_addr + area.length
                 } else {max}
             });
-    let free_phys_addr_start = (kernel_end as u64) + size_of::<FrameStack>() as u64
+    let free_phys_addr_start = (FRAME_STACK as u64) + size_of::<FrameStack>() as u64
          + maximal_phys_addr / PAGE_SIZE * size_of::<PhysicalAddress>() as u64;
 
     let mut stack = FrameStack {
-        first: offset(kernel_end, 1) as *const PhysicalAddress, 
+        first: offset(FRAME_STACK, 1) as *const PhysicalAddress, 
         length: 0,
     };
 
@@ -41,7 +42,7 @@ pub unsafe fn frame_stack(multiboot: *const ::multiboot::Information) {
             }
         }
     }
-    *(kernel_end as *mut FrameStack) = stack;
+    *(FRAME_STACK as *mut FrameStack) = stack;
 }
 
 impl FrameStack {

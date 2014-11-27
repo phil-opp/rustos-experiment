@@ -275,6 +275,14 @@ P1_2:
 times 0x1000 db 0
 P1_3:
 times 0x1000 db 0
+P1_4:
+times 0x1000 db 0
+P1_5:
+times 0x1000 db 0
+P1_6:
+times 0x1000 db 0
+P1_7:
+times 0x1000 db 0
 
 ; - - - - - - - - - - - - - - - - - - - -
 ; needed by linker for division (why??)
