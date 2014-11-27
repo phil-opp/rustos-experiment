@@ -54,7 +54,7 @@ _start:
     mov [P3], eax
 
 .identity_map:
-    ;identity map first 8MB (rw)
+    ;identity map first 16MB (rw)
 
     mov eax, P1_0
     or eax, 1
@@ -72,9 +72,25 @@ _start:
     or eax, 1
     mov [P2 + 24], eax
 
+    mov eax, P1_4
+    or eax, 1
+    mov [P2 + 32], eax
+
+    mov eax, P1_5
+    or eax, 1
+    mov [P2 + 40], eax
+
+    mov eax, P1_6
+    or eax, 1
+    mov [P2 + 48], eax
+
+    mov eax, P1_7
+    or eax, 1
+    mov [P2 + 56], eax
+
     mov edi, P1_0
     mov eax, 0x000003
-    mov ecx, 512*4  ;4 p1 tables
+    mov ecx, 512*8  ;8 p1 tables
 .fill_p1:
     mov dword [edi], eax
     mov dword [edi + 4], 0
