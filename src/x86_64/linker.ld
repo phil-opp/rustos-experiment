@@ -52,6 +52,8 @@ SECTIONS
     *(.eh_frame)
   }
 
+  . = ALIGN(0x1000);
+
   kernel_end_symbol_table_entry = .;
 
 }

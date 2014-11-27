@@ -1,9 +1,9 @@
 #![no_std]
 #![feature(globs, phase, asm)]
 
-extern crate rlibc;
-extern crate "os_std" as std;
-#[phase(plugin)] extern crate "os_std" as std; //macros
+#[phase(plugin, link)] extern crate "os_std" as std;
+extern crate os_alloc;
+
 
 pub use std::prelude::*;
 
@@ -13,11 +13,12 @@ extern {
 }
 
 #[no_mangle]
-pub fn main(multiboot: *const std::multiboot::Information) {
+pub fn main(multiboot: *const ()) {
 
-    unsafe{std::init(&kernel_end_symbol_table_entry as *const (), multiboot)};
+    unsafe{os_alloc::heap::init(&kernel_end_symbol_table_entry as *const (), multiboot)};
     unsafe{asm!("sti")};
     let x = box 5i;
+    panic!();
 
     let y = 0xb8000 as *mut u64;
     unsafe{*y = 0xffffffffffffffff};
@@ -50,5 +51,5 @@ pub extern "C" fn interrupt_handler(interrupt_number: u64, error_code: u64, rsp:
 
 #[no_mangle]
 pub extern "C" fn pagefault_handler(address: u64, error_code: u64, rsp:u64) -> u64 {
-    panic!("page fault: address: {}, error_code: {}, rsp: {}", address, error_code, rsp);
+    panic!("page fault: address: {:x}, error_code: {:b}, rsp: {:x}", address, error_code, rsp);
 }
