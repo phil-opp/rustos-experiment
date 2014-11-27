@@ -2,10 +2,11 @@
 #![feature(globs, phase, asm)]
 
 #[phase(plugin, link)] extern crate "os_std" as std;
-extern crate os_alloc;
-
-
 pub use std::prelude::*;
+
+mod multiboot;
+mod init;
+
 
 extern {
     static kernel_end_symbol_table_entry: ();
@@ -13,9 +14,11 @@ extern {
 }
 
 #[no_mangle]
-pub fn main(multiboot: *const ()) {
+pub fn main(multiboot: *const multiboot::Information) {
 
-    unsafe{os_alloc::heap::init(&kernel_end_symbol_table_entry as *const (), multiboot)};
+    unsafe{init::frame_stack(multiboot)};
+
+    //unsafe{os_alloc::heap::init(&kernel_end_symbol_table_entry as *const (), multiboot)};
     unsafe{asm!("sti")};
     let x = box 5i;
     panic!();
