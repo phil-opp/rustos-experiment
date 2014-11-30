@@ -202,6 +202,15 @@ enable_paging:
     extern idt_pointer
     lidt [idt_pointer]
 
+map_frame_buffer_tables:
+    mov rax, P2_frame_stack
+    or rax, 1
+    mov [P3 + 8], rax
+
+    mov rax, P1_frame_stack
+    or rax, 1
+    mov [P2_frame_stack], rax
+
 .startKernel:
     ;set stack limit (20 * 1024 red zone + 1024 just to be safe :))
     ;see http://doc.rust-lang.org/rustrt/stack/ + src
@@ -258,7 +267,7 @@ times 0x100 db 0
 ;stack
 StackBottom:
 times 0x8000 db 0
-align 0x1000        ;use align bytes as stack
+align 4096        ;use align bytes as stack
 Stack:
 
 P4:
@@ -282,6 +291,11 @@ times 0x1000 db 0
 P1_6:
 times 0x1000 db 0
 P1_7:
+times 0x1000 db 0
+
+P2_frame_stack:
+times 0x1000 db 0
+P1_frame_stack:
 times 0x1000 db 0
 
 ; - - - - - - - - - - - - - - - - - - - -
