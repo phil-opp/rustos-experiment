@@ -11,9 +11,10 @@ mod init;
 #[no_mangle]
 pub fn main(multiboot: *const multiboot::Information) {
 
-    unsafe{init::frame_stack(multiboot)};
+    unsafe{init::init_frame_stack(multiboot)};
 
     unsafe{asm!("sti")};
+    print!("test\n\niuaeiae");
     let x = box 5i;
 
     let y = 0xb8000 as *mut u64;
