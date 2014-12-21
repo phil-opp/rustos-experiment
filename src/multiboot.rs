@@ -1,5 +1,5 @@
-use std::prelude::*;
-use std::intrinsics::offset;
+use core::prelude::*;
+use core::intrinsics::offset;
 
 #[packed]
 #[allow(dead_code)]
@@ -51,13 +51,13 @@ impl Information {
 
         //iterate over tags
         while tag < tag_end_ptr {
-            match *tag {                
-                Tag{typ:0, size:8} => {break;}, //end tag
-                Tag{typ:6, ..} => {
+            match &*tag {                
+                &Tag{typ:0, size:8} => {break;}, //end tag
+                &Tag{typ:6, ..} => {
                     //Memory Map Tag
                     return Some(tag as *const MemoryAreaTag);
                 },
-                t => {
+                ref t => {
                     let mut tag_addr = tag as u32;
                     tag_addr += t.size;
                     tag_addr = ((tag_addr-1) & 0xfffffff8) + 0x8; //align at 8 byte
@@ -96,14 +96,14 @@ impl MemoryAreaIter {
     }
 }
 
-impl Iterator<MemoryArea> for MemoryAreaIter {
-    fn next(&mut self) -> Option<MemoryArea> {
+impl Iterator<&'static MemoryArea> for MemoryAreaIter {
+    fn next(&mut self) -> Option<&'static MemoryArea> {
         if self.current_area > self.last_area {
             None
         } else {
-            let area = unsafe{*self.current_area};
-            self.current_area = ((self.current_area as u32) + self.entry_size) as *const 
-                MemoryArea;
+            let area = unsafe{&*self.current_area};
+            self.current_area = ((self.current_area as u32) + self.entry_size) 
+                as *const MemoryArea;
             if area.typ == 1 {
                 Some(area)
             } else {self.next()}
