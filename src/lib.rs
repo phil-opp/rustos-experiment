@@ -58,7 +58,7 @@ mod vga_buffer;
 #[no_mangle]
 pub fn main(multiboot: *const multiboot::Information) {
 
-    unsafe{init::init_frame_stack(multiboot)};
+    unsafe{init::frame_stack(multiboot)};
 
     unsafe{asm!("sti")};
     print!("test\n\niuaeiae");
