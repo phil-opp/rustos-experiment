@@ -6,13 +6,14 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+#![allow(dead_code)]
+
 use core::prelude::*;
 use core::intrinsics::transmute;
 use core::iter;
 use core::fmt;
 use core::fmt::{FormatWriter, Error};
 
-#[allow(dead_code)]
 pub enum Color {
    Black      = 0,
    Blue       = 1,
@@ -45,7 +46,6 @@ pub struct Writer {
 }
 
 #[packed]
-#[allow(dead_code)]
 struct ScreenCharacter {
    character: u8,
    color: u8,
