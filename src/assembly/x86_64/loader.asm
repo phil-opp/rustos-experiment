@@ -214,7 +214,7 @@ map_frame_buffer_tables:
 .startKernel:
     ;set stack limit (20 * 1024 red zone + 1024 just to be safe :))
     ;see http://doc.rust-lang.org/rustrt/stack/ + src
-    mov qword [fs:0x70], StackBottom + 0x6000
+    mov qword [fs:0x70], 0;StackBottom + 0x6000
 
     mov rdi, rbx ;multiboot structure
 

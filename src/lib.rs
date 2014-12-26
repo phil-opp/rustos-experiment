@@ -84,6 +84,8 @@ pub fn main(multiboot: *const multiboot::Information) {
     println!("newline {}", x);
 
     scheduler::spawn(|| print!("I'm #1!\n"));
+    //loop{};
+    unsafe{kill_current();}
 
     scheduler::spawn(|| -> () {
         loop {
@@ -178,6 +180,9 @@ unsafe fn in_byte(port: u16) -> u8 {
 unsafe fn enable_interrupts() {
     asm!("sti" :::: "volatile");
 }
+unsafe fn kill_current() {
+    unsafe{asm!("int $$66")};
+}
 
 unsafe fn send_eoi(interrupt_number: u64) {
     unsafe fn send_master_eoi() {out_byte(0x20, 0x20)}
@@ -195,20 +200,29 @@ unsafe fn send_eoi(interrupt_number: u64) {
 
 #[no_mangle]
 pub extern "C" fn interrupt_handler(interrupt_number: u64, error_code: u64, rsp:uint) -> uint {
+    //unsafe{panic!("{:x}", (*(rsp as *const scheduler::ThreadRegisters)).flags)};
+
     match interrupt_number {
         13 if error_code != 0 => panic!(
             "General Protection Fault: Segment error at segment 0x{:x}", error_code),
         32 => {},
         33 => print!("k"),
         50 => panic!("out of memory"),
+        66 => {print!("end thread\n"); unsafe{scheduler::kill_current(rsp)};},
         _ => panic!("unknown interrupt! number: {}, error_code: {:x}",interrupt_number, error_code),
     };
-    unsafe{
+    unsafe {
+        if interrupt_number != 66 {
+            scheduler::park_current(rsp);
+        }
+        let new_rsp = scheduler::schedule();
         send_eoi(interrupt_number);
         enable_interrupts();
+        match new_rsp {
+            Some(rsp) => rsp,
+            None => loop{print!("-")}
+        }
     }
-
-    unsafe{scheduler::schedule(rsp)}
 }
 
 #[no_mangle]
