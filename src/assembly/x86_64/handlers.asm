@@ -1,5 +1,4 @@
 [BITS 64]
-
 section .isr
 
 %macro push_xmm 1
@@ -9,16 +8,6 @@ section .isr
 %macro pop_xmm 1
     movdqu  xmm%1, [rsp]
     add     rsp, 16
-%endmacro
-
-%macro send_slave_EOI 0
-    mov al, 0x20    ;EOI code
-    out 0xA0, al    ;send EOI to slave
-%endmacro
-
-%macro send_master_EOI 0
-    mov al, 0x20    ;EOI code
-    out 0x20, al    ;send EOI to master
 %endmacro
 
 push_registers_and_call_handler:
@@ -79,20 +68,6 @@ pop_registers_and_iretq:
     pop rdx
     pop rcx
     pop rbx
-
-    mov rax, [rsp + 8]  ;interrupt number
-    cmp rax, 32
-    jl .finish
-
-    cmp rax, 40
-    jl .master_eoi
-    send_slave_EOI
-
-.master_eoi:
-    send_master_EOI
-    jl .finish
-    
-.finish:
     pop rax
     add rsp, 16 ;remove interrupt number and error code
 

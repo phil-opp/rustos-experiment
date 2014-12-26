@@ -1,5 +1,5 @@
 #![no_std]
-#![feature(globs, phase, asm, macro_rules, lang_items)]
+#![feature(globs, phase, asm, macro_rules, lang_items, default_type_params, unboxed_closures)]
 
 #[phase(plugin, link)] extern crate core;
 extern crate rlibc;
@@ -7,6 +7,7 @@ extern crate "os_alloc" as alloc;
 extern crate unicode;
 extern crate "os_collections" as core_collections;
 extern crate "rand" as core_rand;
+extern crate spinlock;
 
 // NB: These reexports are in the order they should be listed in rustdoc
 
@@ -43,6 +44,8 @@ pub use core_collections::vec;
 
 pub use unicode::char;
 
+use core::prelude::*;
+
 /* Exported macros */
 
 pub mod macros;
@@ -50,17 +53,26 @@ pub mod bitflags;
 
 pub mod fmt;
 
+/* Common data structures */
+
+pub mod collections;
+
+/* new for os */
 mod multiboot;
 mod init;
 mod vga_buffer;
+mod fn_box;
+mod scheduler;
+mod global;
 
 
 #[no_mangle]
 pub fn main(multiboot: *const multiboot::Information) {
 
     unsafe{init::frame_stack(multiboot)};
+    global::init();
+    unsafe{enable_interrupts()};
 
-    unsafe{asm!("sti")};
     print!("test\n\niuaeiae");
     let x = box 5i;
 
@@ -71,10 +83,48 @@ pub fn main(multiboot: *const multiboot::Information) {
     print!("test\n");
     println!("newline {}", x);
 
-    loop {
-        panic!("end of os!");
-        // Add code here
-    }
+    scheduler::spawn(|| print!("I'm #1!\n"));
+
+    scheduler::spawn(|| -> () {
+        loop {
+            let mut x = 0u;
+            for i in range(0,1000000) {
+                x = i;
+            }
+            print!("a {}\n", x);
+        }
+    });
+
+    scheduler::spawn(|| -> () {
+        loop {
+            let mut x = 0u;
+            for i in range(0,1000000) {
+                x = i;
+            }
+            print!("b {}\n", x);
+        }
+    });    
+    scheduler::spawn(|| -> () {
+        loop {
+            let mut x = 0u;
+            for i in range(0,1000000) {
+                x = i;
+            }
+            print!("c {}\n", x);
+        }
+    });    
+    scheduler::spawn(|| -> () {
+        loop {
+            let mut x = 0u;
+            for i in range(0,1000000) {
+                x = i;
+            }
+            print!("d {}\n", x);
+        }
+    });
+
+    loop{}
+    panic!("end of os!");
 }
 
 
@@ -113,25 +163,60 @@ mod std {
 
 /* Interrupt Handlers */
 
+extern {
+//    fn send_eoi(interrupt_number: u64) -> int; //return value to mark rax as used
+}
+
+unsafe fn out_byte(port: u16, data: u8) {
+    asm!("outb %al, %dx" :: "{dx}"(port), "{al}"(data) :: "volatile");
+}
+unsafe fn in_byte(port: u16) -> u8 {
+    let ret: u8;
+    asm!("inb %dx, %al" : "={al}"(ret) : "{dx}"(port) :: "volatile");
+    ret
+}
+unsafe fn enable_interrupts() {
+    asm!("sti" :::: "volatile");
+}
+
+unsafe fn send_eoi(interrupt_number: u64) {
+    unsafe fn send_master_eoi() {out_byte(0x20, 0x20)}
+    unsafe fn send_slave_eoi() {out_byte(0xA0, 0x20)}
+
+    match interrupt_number {
+        i if i >= 40 => {
+            send_slave_eoi(); 
+            send_master_eoi();
+        },
+        32...40 => send_master_eoi(),
+        _ => {},
+    }
+}
+
 #[no_mangle]
-pub extern "C" fn interrupt_handler(interrupt_number: u64, error_code: u64, rsp:u64) -> u64 {
+pub extern "C" fn interrupt_handler(interrupt_number: u64, error_code: u64, rsp:uint) -> uint {
     match interrupt_number {
         13 if error_code != 0 => panic!(
             "General Protection Fault: Segment error at segment 0x{:x}", error_code),
         32 => {},
         33 => print!("k"),
+        50 => panic!("out of memory"),
         _ => panic!("unknown interrupt! number: {}, error_code: {:x}",interrupt_number, error_code),
     };
+    unsafe{
+        send_eoi(interrupt_number);
+        enable_interrupts();
+    }
 
-    rsp
+    unsafe{scheduler::schedule(rsp)}
 }
 
 #[no_mangle]
-pub extern "C" fn pagefault_handler(address: u64, error_code: u64, rsp:u64) -> u64 {
+pub extern "C" fn pagefault_handler(address: u64, error_code: u64, rsp:uint) -> uint {
     panic!("page fault: address: {:x}, error_code: {:b}, rsp: {:x}", address, error_code, rsp);
 }
 
-#[lang = "stack_exhausted"] extern fn stack_exhausted() {unimplemented!();}
+#[lang = "stack_exhausted"] extern fn stack_exhausted() {panic!("stack exhausted");}
 #[lang = "eh_personality"] extern fn eh_personality() {unimplemented!();}
 #[lang = "panic_fmt"] fn panic_fmt() -> ! { unimplemented!();}
 
