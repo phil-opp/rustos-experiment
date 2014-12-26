@@ -16,3 +16,6 @@ git = "https://PhilippOppermann@bitbucket.org/PhilippOppermann/os_collections.gi
 
 [dependencies.os_alloc]
 git = "https://PhilippOppermann@bitbucket.org/PhilippOppermann/os_alloc.git"
+
+[dependencies.spinlock]
+git = "https://github.com/mvdnes/spinlock-rs.git"
