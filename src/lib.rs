@@ -203,10 +203,7 @@ pub extern "C" fn interrupt_handler(interrupt_number: u64, error_code: u64, rsp:
         50 => panic!("out of memory"),
         _ => panic!("unknown interrupt! number: {}, error_code: {:x}",interrupt_number, error_code),
     };
-    unsafe{
-        send_eoi(interrupt_number);
-        enable_interrupts();
-    }
+    unsafe{send_eoi(interrupt_number)};
 
     unsafe{scheduler::schedule(rsp)}
 }
