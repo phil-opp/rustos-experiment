@@ -2,5 +2,5 @@
 /Cargo.lock
 /bin
 /isofiles/boot/os.bin
-rustos5.sublime-workspace
+rustos.sublime-workspace
 os.iso

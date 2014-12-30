@@ -1,11 +1,11 @@
 [package]
 
-name = "rustos5"
+name = "rustos"
 version = "0.0.1"
-authors = ["Philipp Oppermann <philipp.oppermann@student.kit.edu>"]
+authors = ["Philipp Oppermann <dev@phil-opp.com>"]
 
 [lib]
-name = "rustos5"
+name = "rustos"
 crate-type = ["staticlib"]
 
 [dependencies.rlibc]
