@@ -1,18 +1,27 @@
 #![no_std]
 #![feature(globs, phase, asm, macro_rules, lang_items, default_type_params, unboxed_closures)]
 
-#[phase(plugin, link)] extern crate core;
-extern crate rlibc;
+#[cfg(test)] #[phase(plugin, link)] extern crate log;
+
 extern crate "os_alloc" as alloc;
 extern crate unicode;
+#[phase(plugin, link)] extern crate core;
 extern crate "os_collections" as core_collections;
 extern crate "rand" as core_rand;
+extern crate rlibc;
 extern crate spinlock;
+
+// Make std testable by not duplicating lang items. See #2912
+#[cfg(test)] extern crate "std" as realstd;
+#[cfg(test)] pub use realstd::kinds;
+#[cfg(test)] pub use realstd::ops;
+#[cfg(test)] pub use realstd::cmp;
+#[cfg(test)] pub use realstd::boxed;
+
 
 // NB: These reexports are in the order they should be listed in rustdoc
 
 pub use core::any;
-pub use core::bool;
 pub use core::borrow;
 pub use core::cell;
 pub use core::clone;
@@ -27,10 +36,6 @@ pub use core::mem;
 pub use core::ptr;
 pub use core::raw;
 pub use core::simd;
-pub use core::tuple;
-// FIXME #15320: primitive documentation needs top-level modules, this
-// should be `std::tuple::unit`.
-pub use core::unit;
 pub use core::result;
 pub use core::option;
 
@@ -51,11 +56,6 @@ use core::prelude::*;
 pub mod macros;
 pub mod bitflags;
 
-pub mod fmt;
-
-/* Common data structures */
-
-pub mod collections;
 
 /* new for os */
 mod multiboot;
@@ -64,6 +64,20 @@ mod vga_buffer;
 mod fn_box;
 mod scheduler;
 mod global;
+
+
+pub mod fmt;
+
+/* Common data structures */
+
+pub mod collections;
+
+
+// Documentation for primitive types
+
+mod bool;
+mod unit;
+mod tuple;
 
 
 #[no_mangle]
@@ -126,7 +140,6 @@ pub fn main(multiboot: *const multiboot::Information) {
     loop{}
     panic!("end of os!");
 }
-
 
 // A curious inner-module that's not exported that contains the binding
 // 'std' so that macro-expanded references to std::error and such
