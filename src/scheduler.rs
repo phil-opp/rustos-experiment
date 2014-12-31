@@ -10,43 +10,56 @@ pub fn spawn<F, R>(f:F) -> Future<R> where F: FnOnce()->R, F:Send {
     global().scheduler.lock().spawn(f)
 }
 
-pub unsafe fn schedule(current_rsp: uint) -> uint {
-    // park current thread
-    let current = Thread::from_rsp(current_rsp);
-    global().scheduler.lock().park(current);
-    // schedule new thread
-    loop {
-        match global().scheduler.lock().schedule().unwrap_or_default() {
-            Thread{state: ThreadState::Active{rsp}} => return rsp,
-            Thread{state: ThreadState::New{function}} => {
+pub unsafe fn reschedule(current_rsp: uint) -> ! {
 
-                print!("creating thread...");
+    // switch stack so we can park current thread
+    const SCHEDULER_STACK_SIZE: uint = 4096;
+    static SCHEDULER_STACK: [u8; SCHEDULER_STACK_SIZE] = [0; SCHEDULER_STACK_SIZE];
 
-                let stack_bottom = allocate(4096*2, 4096);
-                let stack_top = (stack_bottom as uint + 4096*2);
+    let scheduler_stack_top = &SCHEDULER_STACK as *const [u8; 4096] as uint
+        + SCHEDULER_STACK_SIZE;
+    call_on_stack(inner, current_rsp, scheduler_stack_top);
 
-                print!("bottom {:x} top {:x}\n", stack_bottom as uint, stack_top as uint);
-                panic!("done\n");
+    fn inner(current_rsp: uint) -> ! {
+        extern {
+            fn pop_registers_and_iret(rsp: uint) -> !;
+        }
 
+        // park current thread
+        let current = Thread::from_rsp(current_rsp);
+        global().scheduler.lock().park(current);
 
-                asm!("
-                    mov rdi, rsp;   // backup stack pointer
-                    mov rsp, $2;    // load new stack pointer
-                    push rdi;       // push our stack pointer to new stack
-                    mov rdi, $1;    // load argument
-                    call $0;        // call invocation fn on new stack 
-                    pop rsp;        // restore old stack
-                    " 
-                    :: "r"(invoke), "r"(function), "r"(stack_top) : "rdi" : "intel");
-            },
+        // schedule new thread
+        loop {
+            print!("_");
+            let new_thread = unsafe{global().scheduler.lock().schedule().unwrap_or_default()};
+            match new_thread {
+                Thread{state: ThreadState::Active{rsp}} => {
+                    unsafe{pop_registers_and_iret(rsp)}
+                },
+                Thread{state: ThreadState::New{function}} => {
+                    print!("new");
+                    let new_stack_top = new_stack();
+                    // TODO new stack
+                    function.call_once(())
+                },
+            }
         }
     }
+    
 }
 
-extern "C" fn invoke(function: Box<FnBox() + Send>) {
-    function.call_once(())
+fn new_stack() -> uint {
+    const NEW_STACK_SIZE: uint = 4096*2;
+    let stack_bottom = unsafe{allocate(NEW_STACK_SIZE, 4096)};
+    let stack_top = (stack_bottom as uint + NEW_STACK_SIZE);
+    stack_top
 }
 
+fn call_on_stack<Arg>(function: fn(Arg) -> !, arg: Arg, stack_top: uint) -> ! {
+    unsafe{asm!("call $0;" :: "r"(function), "{rdi}"(arg), "{rsp}"(stack_top) :: "intel")}
+    panic!("diverging fn returned");
+}
 
 pub type GlobalScheduler = Scheduler;
 impl GlobalScheduler {
