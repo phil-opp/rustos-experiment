@@ -43,7 +43,11 @@ push_registers_and_call_handler:
 
     call rax
 
-pop_registers_and_iretq:
+    mov rdi, rsp
+
+global pop_registers_and_iret
+pop_registers_and_iret:
+    mov rsp, rdi
     pop qword [fs:0x70] ;restore stack limit
 
     ;pop xmm registers
