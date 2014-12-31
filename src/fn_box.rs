@@ -32,6 +32,7 @@ fn can_be_boxed() {
 
 #[test]
 fn can_be_sent() {
+  use core::kinds::Send;
   let f = move |:| {};
   let _: Box<FnBox<()> + Send> = box f;
 }

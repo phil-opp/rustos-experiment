@@ -3,10 +3,12 @@
 
 #[cfg(test)] #[phase(plugin, link)] extern crate log;
 
-extern crate "os_alloc" as alloc;
+#[cfg(not(test))] extern crate "os_alloc" as alloc;
+#[cfg(test)] extern crate alloc;
 extern crate unicode;
 #[phase(plugin, link)] extern crate core;
-extern crate "os_collections" as core_collections;
+#[cfg(not(test))] extern crate "os_collections" as core_collections;
+#[cfg(test)] extern crate "collections" as core_collections;
 extern crate "rand" as core_rand;
 extern crate rlibc;
 extern crate spinlock;
@@ -54,8 +56,6 @@ use core::prelude::*;
 /* Exported macros */
 
 pub mod macros;
-pub mod bitflags;
-
 
 /* new for os */
 mod multiboot;
@@ -226,9 +226,17 @@ pub extern "C" fn pagefault_handler(address: u64, error_code: u64, rsp:uint) -> 
     panic!("page fault: address: {:x}, error_code: {:b}, rsp: {:x}", address, error_code, rsp);
 }
 
-#[lang = "stack_exhausted"] extern fn stack_exhausted() {panic!("stack exhausted");}
-#[lang = "eh_personality"] extern fn eh_personality() {unimplemented!();}
-#[lang = "panic_fmt"] fn panic_fmt() -> ! { unimplemented!();}
+#[cfg(not(test))]
+#[lang = "stack_exhausted"] 
+extern fn stack_exhausted() {panic!("stack exhausted");}
+
+#[cfg(not(test))]
+#[lang = "eh_personality"] 
+extern fn eh_personality() {unimplemented!();}
+
+#[cfg(not(test))]
+#[lang = "panic_fmt"] 
+fn panic_fmt() -> ! { unimplemented!();}
 
 #[no_mangle]
 #[allow(non_snake_case)]
