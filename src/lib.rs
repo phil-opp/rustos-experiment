@@ -97,27 +97,38 @@ pub fn main(multiboot: *const multiboot::Information) {
     print!("test\n");
     println!("newline {}", x);
 
-    scheduler::spawn(|| print!("I'm #1!\n"));
 
-    scheduler::spawn(|| -> () {
-        loop {
-            let mut x = 0u;
+    loop{
+        let mut x = 0u;
             for i in range(0,1000000) {
                 x = i;
             }
-            print!("a {}\n", x);
+        print!("m {} ", x);
+    }    
+    scheduler::spawn(|| print!("I'm #1!\n"));
+    scheduler::spawn(|| -> () {
+        loop {
+            print!("a");
+            /*let mut x = 0u;
+            for i in range(0,1000000) {
+                x = i;
+            }
+            print!("a {}\n", x);*/
         }
     });
 
     scheduler::spawn(|| -> () {
         loop {
+            print!("b");
+            /*
             let mut x = 0u;
             for i in range(0,1000000) {
                 x = i;
             }
             print!("b {}\n", x);
+            */
         }
-    });    
+    });
     scheduler::spawn(|| -> () {
         loop {
             let mut x = 0u;
@@ -207,7 +218,7 @@ unsafe fn send_eoi(interrupt_number: u64) {
 }
 
 #[no_mangle]
-pub extern "C" fn interrupt_handler(interrupt_number: u64, error_code: u64, rsp:uint) -> uint {
+pub extern "C" fn interrupt_handler(interrupt_number: u64, error_code: u64, rsp:uint) {
     match interrupt_number {
         13 if error_code != 0 => panic!(
             "General Protection Fault: Segment error at segment 0x{:x}", error_code),
@@ -218,11 +229,14 @@ pub extern "C" fn interrupt_handler(interrupt_number: u64, error_code: u64, rsp:
     };
     unsafe{send_eoi(interrupt_number)};
 
-    unsafe{scheduler::schedule(rsp)}
+    match interrupt_number {
+        32 | 33 => unsafe{scheduler::reschedule(rsp)},
+        _ => {},
+    }    
 }
 
 #[no_mangle]
-pub extern "C" fn pagefault_handler(address: u64, error_code: u64, rsp:uint) -> uint {
+pub extern "C" fn pagefault_handler(address: u64, error_code: u64, rsp:uint) {
     panic!("page fault: address: {:x}, error_code: {:b}, rsp: {:x}", address, error_code, rsp);
 }
 
