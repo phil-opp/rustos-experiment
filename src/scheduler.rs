@@ -25,10 +25,11 @@ pub unsafe fn reschedule(current_rsp: uint) -> ! {
 }
 
 pub unsafe fn schedule() -> ! {
-    call_on_stack(inner, (), scheduler_stack_top());
-
-    fn inner(_:()) -> ! {
-        schedule_inner();
+    call_on_stack(schedule_inner, scheduler_stack_top());
+    
+    unsafe fn call_on_stack(function: fn() -> !, stack_top: uint) -> ! {
+        asm!("call $0;" :: "r"(function), "{rsp}"(stack_top) :: "intel", "volatile");
+        panic!("diverging fn returned");
     }
 }
 
