@@ -25,11 +25,16 @@ pub unsafe fn reschedule(current_rsp: uint) -> ! {
 }
 
 pub unsafe fn schedule() -> ! {
-    call_on_stack(schedule_inner, scheduler_stack_top());
+    call_on_stack(inner, scheduler_stack_top());
     
     unsafe fn call_on_stack(function: fn() -> !, stack_top: uint) -> ! {
         asm!("call $0;" :: "r"(function), "{rsp}"(stack_top) :: "intel", "volatile");
         panic!("diverging fn returned");
+    }
+
+    fn inner() -> ! {
+        // TODO FIXME kill current thread and deallocate stack
+        schedule_inner()
     }
 }
 
@@ -47,13 +52,13 @@ fn schedule_inner() -> ! {
     }
 
     fn invoke(function: Box<FnBox() + Send>) -> ! {
+        unsafe{::enable_interrupts()};
         function.call_once(());
         unsafe{asm!("int $$66" :::: "volatile")};
         unreachable!();
     }
 
     // schedule new thread
-    print!("_");
     let new_thread = unsafe{global().scheduler.lock().schedule().unwrap_or_default()};
 
     match new_thread {
@@ -63,8 +68,7 @@ fn schedule_inner() -> ! {
         Thread{state: ThreadState::New{function}} => {
             println!("new");
             let new_stack_top = new_stack();
-            let invoke_fn : fn(Box<FnBox() + Send>) -> ! = invoke;
-            unsafe{call_on_stack(invoke_fn, function, new_stack_top)}
+            unsafe{call_on_stack(invoke, function, new_stack_top)}
         },
     }
 }
