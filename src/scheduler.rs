@@ -20,6 +20,19 @@ pub unsafe fn reschedule(current_rsp: uint) -> ! {
         + SCHEDULER_STACK_SIZE;
     call_on_stack(inner, current_rsp, scheduler_stack_top);
 
+    fn new_stack() -> uint {
+        const NEW_STACK_SIZE: uint = 4096*2;
+        let stack_bottom = unsafe{allocate(NEW_STACK_SIZE, 4096)};
+        let stack_top = (stack_bottom as uint + NEW_STACK_SIZE);
+        stack_top
+    }
+
+    fn call_on_stack<Arg>(function: fn(Arg) -> !, arg: Arg, stack_top: uint) -> ! {
+        unsafe{asm!("call $0;" :: "r"(function), "{rdi}"(arg), "{rsp}"(stack_top) :
+            : "intel", "volatile")}
+        panic!("diverging fn returned");
+    }
+
     fn inner(current_rsp: uint) -> ! {
         extern {
             fn pop_registers_and_iret(rsp: uint) -> !;
@@ -38,27 +51,21 @@ pub unsafe fn reschedule(current_rsp: uint) -> ! {
                     unsafe{pop_registers_and_iret(rsp)}
                 },
                 Thread{state: ThreadState::New{function}} => {
-                    print!("new");
+                    println!("new");
                     let new_stack_top = new_stack();
-                    // TODO new stack
-                    function.call_once(())
+                    let invoke_fn : fn(Box<FnBox() + Send>) -> ! = invoke;
+                    call_on_stack(invoke_fn, function, new_stack_top)
                 },
             }
         }
     }
+
+    fn invoke(function: Box<FnBox() + Send>) -> ! {
+        function.call_once(());
+        unsafe{asm!("int $$66" :::: "volatile")};
+        unreachable!();
+    }
     
-}
-
-fn new_stack() -> uint {
-    const NEW_STACK_SIZE: uint = 4096*2;
-    let stack_bottom = unsafe{allocate(NEW_STACK_SIZE, 4096)};
-    let stack_top = (stack_bottom as uint + NEW_STACK_SIZE);
-    stack_top
-}
-
-fn call_on_stack<Arg>(function: fn(Arg) -> !, arg: Arg, stack_top: uint) -> ! {
-    unsafe{asm!("call $0;" :: "r"(function), "{rdi}"(arg), "{rsp}"(stack_top) :: "intel")}
-    panic!("diverging fn returned");
 }
 
 pub type GlobalScheduler = Scheduler;
