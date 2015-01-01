@@ -1,6 +1,6 @@
 extern crate "os_x86_64_frame_stack" as frame_stack;
 
-use std::prelude::*;
+use core::prelude::*;
 use self::frame_stack::Frame;
 
 extern {
