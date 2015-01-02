@@ -12,8 +12,9 @@ pub fn spawn<F, R>(f:F) -> Future<R> where F: FnOnce()->R, F:Send {
 }
 
 pub unsafe fn reschedule(current_rsp: uint) -> ! {
+    // we must not be interrupted while using the scheduler stack
+    ::disable_interrupts();
     // switch stack so we can park current thread
-
     call_on_stack(inner, current_rsp, scheduler_stack_top());
 
     fn inner(current_rsp: uint) -> ! {
@@ -23,13 +24,20 @@ pub unsafe fn reschedule(current_rsp: uint) -> ! {
 
         let thread = match scheduler.try_park(current) {
             Ok(()) => scheduler.schedule(),
-            Err(thread) => thread,
+            Err(thread) => {
+                println!("thread list is locked. Maybe a thread was interrupted while holding
+                    the lock in spawn()?"); 
+                thread
+            },
         };
         start_thread(thread)
     }    
 }
 
 pub unsafe fn schedule() -> ! {
+    // we must not be interrupted while using the scheduler stack
+    ::disable_interrupts();
+    // switch to scheduler stack (the stack of current thread could be to full/small)
     call_on_stack(inner, scheduler_stack_top());
     
     unsafe fn call_on_stack(function: fn() -> !, stack_top: uint) -> ! {
@@ -145,8 +153,6 @@ impl GlobalScheduler {
         self.threads.lock().push_back(Thread::new(move |:| {
             /*tx.send_opt(*/ f();
         }));
-
-        unsafe{::enable_interrupts()};
 
         Future/*::from_receiver(rx)*/
     }
