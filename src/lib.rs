@@ -97,56 +97,32 @@ pub fn main(multiboot: *const multiboot::Information) {
     print!("test\n");
     println!("newline {}", x);
 
+    scheduler::spawn(|| print!("I'm #1!\n"));
 
+    fn test(name: &str) {
+        loop {
+            let mut x = 0u;
+            for i in range(0,100000) {
+                x = i;
+            }
+            print!("{}", name);
+        }
+    }
+
+    scheduler::spawn(|| test("1"));
+    scheduler::spawn(|| test("2"));
+    scheduler::spawn(|| test("3"));
+    scheduler::spawn(|| test("4"));
+    scheduler::spawn(|| test("5"));
+    scheduler::spawn(|| test("6"));
     loop{
         let mut x = 0u;
-            for i in range(0,1000000) {
+            for i in range(0,100000) {
                 x = i;
             }
-        print!("m {} ", x);
+        print!("m");
     }    
-    scheduler::spawn(|| print!("I'm #1!\n"));
-    scheduler::spawn(|| -> () {
-        loop {
-            print!("a");
-            /*let mut x = 0u;
-            for i in range(0,1000000) {
-                x = i;
-            }
-            print!("a {}\n", x);*/
-        }
-    });
 
-    scheduler::spawn(|| -> () {
-        loop {
-            print!("b");
-            /*
-            let mut x = 0u;
-            for i in range(0,1000000) {
-                x = i;
-            }
-            print!("b {}\n", x);
-            */
-        }
-    });
-    scheduler::spawn(|| -> () {
-        loop {
-            let mut x = 0u;
-            for i in range(0,1000000) {
-                x = i;
-            }
-            print!("c {}\n", x);
-        }
-    });    
-    scheduler::spawn(|| -> () {
-        loop {
-            let mut x = 0u;
-            for i in range(0,1000000) {
-                x = i;
-            }
-            print!("d {}\n", x);
-        }
-    });
 
     loop{}
     panic!("end of os!");
@@ -202,6 +178,9 @@ unsafe fn in_byte(port: u16) -> u8 {
 unsafe fn enable_interrupts() {
     asm!("sti" :::: "volatile");
 }
+unsafe fn disable_interrupts() {
+    asm!("cli" :::: "volatile");
+}
 
 unsafe fn send_eoi(interrupt_number: u64) {
     unsafe fn send_master_eoi() {out_byte(0x20, 0x20)}
@@ -225,12 +204,14 @@ pub extern "C" fn interrupt_handler(interrupt_number: u64, error_code: u64, rsp:
         32 => {},
         33 => print!("k"),
         50 => panic!("out of memory"),
+        66 => println!("ending thread..."),
         _ => panic!("unknown interrupt! number: {}, error_code: {:x}",interrupt_number, error_code),
     };
     unsafe{send_eoi(interrupt_number)};
 
     match interrupt_number {
-        32 | 33 => unsafe{scheduler::reschedule(rsp)},
+        32 => unsafe{scheduler::reschedule(rsp)},
+        66 => unsafe{scheduler::schedule()},
         _ => {},
     }    
 }
