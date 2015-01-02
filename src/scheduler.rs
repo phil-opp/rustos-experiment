@@ -2,7 +2,7 @@ use core::prelude::*;
 use core::default::Default;
 use boxed::Box;
 use fn_box::FnBox;
-use collections::RingBuf;
+use collections::DList;
 use global::global;
 use alloc::heap::allocate;
 use spinlock::{Spinlock, SpinlockGuard};
@@ -25,7 +25,7 @@ pub unsafe fn reschedule(current_rsp: uint) -> ! {
         let thread = match scheduler.try_park(current) {
             Ok(()) => scheduler.schedule(),
             Err(thread) => {
-                println!("thread list is locked. Maybe a thread was interrupted while holding
+                println!("thread list is locked. Maybe a thread was interrupted while holding \
                     the lock in spawn()?"); 
                 thread
             },
@@ -136,13 +136,13 @@ enum ThreadState {
 }
 
 pub struct GlobalScheduler {
-    threads: Spinlock<RingBuf<Thread>>,
+    threads: Spinlock<DList<Thread>>,
 }
 
 impl GlobalScheduler {
     pub fn new() -> GlobalScheduler {
         GlobalScheduler{
-            threads: Spinlock::new(RingBuf::new()),
+            threads: Spinlock::new(DList::new()),
         }
     }
 
