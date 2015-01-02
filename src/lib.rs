@@ -115,13 +115,8 @@ pub fn main(multiboot: *const multiboot::Information) {
     scheduler::spawn(|| test("4"));
     scheduler::spawn(|| test("5"));
     scheduler::spawn(|| test("6"));
-    loop{
-        let mut x = 0u;
-            for i in range(0,100000) {
-                x = i;
-            }
-        print!("m");
-    }    
+    
+    test("m");
 
 
     loop{}
