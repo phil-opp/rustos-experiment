@@ -5,9 +5,10 @@ use fn_box::FnBox;
 use collections::RingBuf;
 use global::global;
 use alloc::heap::allocate;
+use spinlock::{Spinlock, SpinlockGuard};
 
 pub fn spawn<F, R>(f:F) -> Future<R> where F: FnOnce()->R, F:Send {
-    global().scheduler.lock().spawn(f)
+    global().scheduler.spawn(f)
 }
 
 pub unsafe fn reschedule(current_rsp: uint) -> ! {
@@ -18,7 +19,7 @@ pub unsafe fn reschedule(current_rsp: uint) -> ! {
     fn inner(current_rsp: uint) -> ! {
         // park current thread
         let current = Thread::from_rsp(current_rsp);
-        global().scheduler.lock().park(current);
+        global().scheduler.park(current);
 
         schedule_inner();
     }    
@@ -59,7 +60,7 @@ fn schedule_inner() -> ! {
     }
 
     // schedule new thread
-    let new_thread = unsafe{global().scheduler.lock().schedule().unwrap_or_default()};
+    let new_thread = unsafe{global().scheduler.schedule().unwrap_or_default()};
 
     match new_thread {
         Thread{state: ThreadState::Active{rsp}} => {
@@ -84,13 +85,6 @@ unsafe fn call_on_stack<Arg>(function: fn(Arg) -> !, arg: Arg, stack_top: uint) 
     asm!("call $0;" :: "r"(function), "{rdi}"(arg), "{rsp}"(stack_top) :
         : "intel", "volatile");
     panic!("diverging fn returned");
-}
-
-pub type GlobalScheduler = Scheduler;
-impl GlobalScheduler {
-    pub fn new() -> GlobalScheduler {
-        Scheduler::new()
-    }
 }
 
 pub struct Future<T>;
@@ -132,34 +126,42 @@ enum ThreadState {
     }
 }
 
+struct NonInterruptableSpinlock<T>(Spinlock<T>);
 
-pub struct Scheduler {
-    threads: RingBuf<Thread>,
+impl<T> NonInterruptableSpinlock<T> {
+    pub fn lock(&self) -> SpinlockGuard<T> {
+        unsafe{::disable_interrupts()};
+        self.0.lock()
+    }
 }
 
-impl Scheduler {
-    pub fn new() -> Scheduler {
-        Scheduler{
-            threads: RingBuf::new(),
+pub struct GlobalScheduler {
+    threads: NonInterruptableSpinlock<RingBuf<Thread>>,
+}
+
+impl GlobalScheduler {
+    pub fn new() -> GlobalScheduler {
+        GlobalScheduler{
+            threads: NonInterruptableSpinlock(Spinlock::new(RingBuf::new())),
         }
     }
 
-    fn spawn<F, R>(&mut self, f:F) -> Future<R> where F: FnOnce()->R, F: Send {
+    fn spawn<F, R>(&self, f:F) -> Future<R> where F: FnOnce()->R, F: Send {
         
         //let (tx, rx) = channel();
 
-        self.threads.push_back(Thread::new(move |:| {
+        self.threads.lock().push_back(Thread::new(move |:| {
             /*tx.send_opt(*/ f();
         }));
 
         Future/*::from_receiver(rx)*/
     }
 
-    fn park(&mut self, thread: Thread) {
-        self.threads.push_back(thread)
+    fn park(&self, thread: Thread) {
+        self.threads.lock().push_back(thread)
     }
 
-    unsafe fn schedule(&mut self) -> Option<Thread> {
-        self.threads.pop_front()
+    unsafe fn schedule(&self) -> Option<Thread> {
+        self.threads.lock().pop_front()
     }
 }
