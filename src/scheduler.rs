@@ -17,11 +17,15 @@ pub unsafe fn reschedule(current_rsp: uint) -> ! {
     call_on_stack(inner, current_rsp, scheduler_stack_top());
 
     fn inner(current_rsp: uint) -> ! {
-        // park current thread
+        // try to park current thread
         let current = Thread::from_rsp(current_rsp);
-        global().scheduler.park(current);
+        let scheduler = &global().scheduler;
 
-        schedule_inner();
+        let thread = match scheduler.try_park(current) {
+            Ok(()) => scheduler.schedule(),
+            Err(thread) => thread,
+        };
+        start_thread(thread)
     }    
 }
 
@@ -35,11 +39,11 @@ pub unsafe fn schedule() -> ! {
 
     fn inner() -> ! {
         // TODO FIXME kill current thread and deallocate stack
-        schedule_inner()
+        start_thread(global().scheduler.schedule())
     }
 }
 
-fn schedule_inner() -> ! {
+fn start_thread(thread: Thread) -> ! {
     #[allow(improper_ctypes)]
     extern {
         fn pop_registers_and_iret(rsp: uint) -> !;
@@ -59,10 +63,7 @@ fn schedule_inner() -> ! {
         unreachable!();
     }
 
-    // schedule new thread
-    let new_thread = unsafe{global().scheduler.schedule().unwrap_or_default()};
-
-    match new_thread {
+    match thread {
         Thread{state: ThreadState::Active{rsp}} => {
             unsafe{pop_registers_and_iret(rsp)}
         },
@@ -126,23 +127,14 @@ enum ThreadState {
     }
 }
 
-struct NonInterruptableSpinlock<T>(Spinlock<T>);
-
-impl<T> NonInterruptableSpinlock<T> {
-    pub fn lock(&self) -> SpinlockGuard<T> {
-        unsafe{::disable_interrupts()};
-        self.0.lock()
-    }
-}
-
 pub struct GlobalScheduler {
-    threads: NonInterruptableSpinlock<RingBuf<Thread>>,
+    threads: Spinlock<RingBuf<Thread>>,
 }
 
 impl GlobalScheduler {
     pub fn new() -> GlobalScheduler {
         GlobalScheduler{
-            threads: NonInterruptableSpinlock(Spinlock::new(RingBuf::new())),
+            threads: Spinlock::new(RingBuf::new()),
         }
     }
 
@@ -159,11 +151,14 @@ impl GlobalScheduler {
         Future/*::from_receiver(rx)*/
     }
 
-    fn park(&self, thread: Thread) {
-        self.threads.lock().push_back(thread)
+    fn try_park(&self, thread: Thread) -> Result<(), Thread> {
+        match self.threads.try_lock() {
+            Some(mut threads) => Ok(threads.push_back(thread)),
+            None => Err(thread),
+        }
     }
 
-    unsafe fn schedule(&self) -> Option<Thread> {
-        self.threads.lock().pop_front()
+    fn schedule(&self) -> Thread {
+        self.threads.lock().pop_front().unwrap_or_default()
     }
 }
