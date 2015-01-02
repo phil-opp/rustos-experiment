@@ -154,6 +154,8 @@ impl GlobalScheduler {
             /*tx.send_opt(*/ f();
         }));
 
+        unsafe{::enable_interrupts()};
+
         Future/*::from_receiver(rx)*/
     }
 
