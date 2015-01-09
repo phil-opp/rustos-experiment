@@ -8,7 +8,6 @@
 
 use core::prelude::*;
 use core::intrinsics::transmute;
-use core::iter;
 use core::fmt;
 use core::fmt::{Writer, Error};
 
@@ -33,13 +32,13 @@ pub enum Color {
 }
 impl Copy for Color {}
 
-static SCREEN_ADDR: uint = 0xb8000;
-static MAX_ROW: uint = 25;
-static MAX_COLUMN: uint = 80;
+static SCREEN_ADDR: usize = 0xb8000;
+static MAX_ROW: u32 = 25;
+static MAX_COLUMN: u32 = 80;
 
 pub struct ScreenWriter {
-   row: uint,
-   col: uint,
+   row: u32,
+   col: u32,
    foreground: Color,
    background: Color,
 }
@@ -101,16 +100,16 @@ impl Writer for ScreenWriter {
 
 impl ScreenWriter {
    #[inline]
-   fn screen_char_at(pos:uint) -> &'static ScreenCharacter {
-      unsafe{transmute::<uint,&ScreenCharacter>(SCREEN_ADDR + pos * 2)}
+   fn screen_char_at(pos: u32) -> &'static ScreenCharacter {
+      unsafe{transmute::<_,&ScreenCharacter>(SCREEN_ADDR + pos as usize * 2)}
    }
    #[inline]
-   fn mut_screen_char_at(pos:uint) -> &'static mut ScreenCharacter {
-      unsafe{transmute::<uint,&mut ScreenCharacter>(SCREEN_ADDR + pos * 2)}
+   fn mut_screen_char_at(pos: u32) -> &'static mut ScreenCharacter {
+      unsafe{transmute::<_ ,&mut ScreenCharacter>(SCREEN_ADDR + pos as usize * 2)}
    }
 
    fn clear_screen(&mut self) {
-      for line in iter::range(0, MAX_ROW) {
+      for line in (0..MAX_ROW) {
          self.clear_line(line);
       }
       self.row = 0;
@@ -145,7 +144,7 @@ impl ScreenWriter {
    }
 
 
-   fn clear_line(&mut self, row: uint) {
+   fn clear_line(&mut self, row: u32) {
       let c = self.col;
       let r = self.row;
       self.col = 0;
@@ -157,7 +156,7 @@ impl ScreenWriter {
 
    fn clear_rem_line(&mut self) {
       let rpos = self.row * MAX_COLUMN;
-      for i in iter::range(self.col, MAX_COLUMN) {
+      for i in (self.col..MAX_COLUMN) {
          let pos = rpos + i;
          let screen_char = ScreenWriter::mut_screen_char_at(pos);
          *screen_char = ScreenCharacter::new(' ' as u8, self.foreground, self.background);
@@ -175,8 +174,8 @@ impl ScreenWriter {
    }
 
    fn shift_rows_up(&mut self) {
-      for r in iter::range(0, MAX_ROW-1) {
-         for c in iter::range(0, MAX_COLUMN) {
+      for r in (0..MAX_ROW-1) {
+         for c in (0..MAX_COLUMN) {
             let new_pos = r * MAX_COLUMN + c;
             let old_pos = (r+1) * MAX_COLUMN + c;
 

@@ -28,7 +28,7 @@ impl Copy for VirtualAddress{}
 
 #[derive(PartialEq)]
 struct Page {
-    number: uint,
+    number: usize,
 }
 impl Copy for Page{}
 struct PageIter(Page);
@@ -63,7 +63,7 @@ static FIRST_PAGE : Page = Page {
     number: 0o_001_000_000_000,
 };
 
-pub unsafe fn allocate(size: uint, align: uint) -> *const u8 {
+pub unsafe fn allocate(size: usize, align: usize) -> *const u8 {
     if allocator.is_none() {
         FIRST_PAGE.map_to_new_frame();
         allocator = Some(Allocator {
@@ -74,13 +74,13 @@ pub unsafe fn allocate(size: uint, align: uint) -> *const u8 {
     allocator.as_mut().expect("allocator must be initialized").allocate(size, align).0
 }
 
-pub unsafe fn deallocate(_ptr: *mut u8, _old_size: uint, _align: uint) {
-    //print!("start: {:x}, size: {:x}, align: {:x}\n", _ptr as uint, _old_size, _align);
+pub unsafe fn deallocate(_ptr: *mut u8, _old_size: usize, _align: usize) {
+    //print!("start: {:x}, size: {:x}, align: {:x}\n", _ptr as usize, _old_size, _align);
 }
 
 impl Allocator {
-    unsafe fn allocate(&mut self, size: uint, align: uint) -> VirtualAddress {
-        let addr = self.next_byte.0 as uint;
+    unsafe fn allocate(&mut self, size: usize, align: usize) -> VirtualAddress {
+        let addr = self.next_byte.0 as usize;
 
         //align
         if align > 0 && addr % align != 0 {
@@ -100,8 +100,8 @@ impl Allocator {
         self.current_page = end_page;
        
         // DEBUGGING: zero allocated bytes
-        for i in range(0, size) {
-            *((start.0 as uint + i) as *mut u8) = 0;
+        for i in (0..size) {
+            *((start.0 as usize + i) as *mut u8) = 0;
         }
 
         start
@@ -111,7 +111,7 @@ impl Allocator {
 impl Page {
     fn from_address(address: &VirtualAddress) -> Page {
         Page {
-            number: address.0 as uint >> 12,
+            number: address.0 as usize >> 12,
         }
     }
 
@@ -124,10 +124,10 @@ impl Page {
         }
     }
 
-    fn p4_index(&self) -> uint {(self.number >> 27) & 0o777}
-    fn p3_index(&self) -> uint {(self.number >> 18) & 0o777}
-    fn p2_index(&self) -> uint {(self.number >> 9) & 0o777}
-    fn p1_index(&self) -> uint {(self.number >> 0) & 0o777}
+    fn p4_index(&self) -> usize {(self.number >> 27) & 0o777}
+    fn p3_index(&self) -> usize {(self.number >> 18) & 0o777}
+    fn p2_index(&self) -> usize {(self.number >> 9) & 0o777}
+    fn p1_index(&self) -> usize {(self.number >> 0) & 0o777}
 
     fn p4_page(&self) -> PageTablePage {
         PageTablePage(Page {
@@ -173,8 +173,8 @@ impl Page {
     }
 
     unsafe fn zero(&self) {
-        let page = self.start_address().0 as *mut [u64; (PAGE_SIZE/64) as uint];
-        *page = [0; (PAGE_SIZE/64) as uint];
+        let page = self.start_address().0 as *mut [u64; (PAGE_SIZE/64) as usize];
+        *page = [0; (PAGE_SIZE/64) as usize];
     }
 
     fn next_pages(self) -> PageIter {
@@ -192,9 +192,9 @@ impl Iterator for PageIter {
 }
 
 impl PageTablePage {
-    fn field(&self, index: uint) -> PageTableField {
-        //print!("index: {} pointer: {:o}\n", index, self.0.start_address().0 as uint + (index * 8));
-        PageTableField((self.0.start_address().0 as uint + (index * 8)) as *const u64)
+    fn field(&self, index: usize) -> PageTableField {
+        //print!("index: {} pointer: {:o}\n", index, self.0.start_address().0 as usize + (index * 8));
+        PageTableField((self.0.start_address().0 as usize + (index * 8)) as *const u64)
     }
     fn zero(&self) {unsafe{self.0.zero()}}
 }
@@ -204,8 +204,8 @@ impl VirtualAddress {
         Page::from_address(self)
     }
 
-    fn page_offset(&self) -> uint {
-        self.0 as uint & 0xfff
+    fn page_offset(&self) -> u32 {
+        self.0 as u32 & 0xfff
     }
 }
 
@@ -213,7 +213,7 @@ impl PageTableField {
 
     unsafe fn is(&self, flags: PageTableFieldFlags) -> bool {
         
-        //print!("{:o}\n", self.0 as uint);
+        //print!("{:o}\n", self.0 as usize);
         PageTableFieldFlags::from_bits_truncate(*(self.0)).contains(flags)
     }
 
