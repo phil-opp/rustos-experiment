@@ -1,0 +1,17 @@
+[package]
+name = "alloc"
+version = "0.0.1"
+authors = [ "you@example.com" ]
+
+[lib]
+name = "alloc"
+
+
+[features]
+default  = []
+external_funcs = []
+external_crate = [ "external" ]
+
+[target.x86_64-unknown-linux-gnu.dependencies.external]
+path = "../../arch/x86_64/allocator"
+optional = true
