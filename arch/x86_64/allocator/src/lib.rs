@@ -63,7 +63,7 @@ static FIRST_PAGE : Page = Page {
     number: 0o_001_000_000_000,
 };
 
-pub unsafe fn allocate(size: usize, align: usize) -> *const u8 {
+pub unsafe fn allocate(size: usize, align: usize) -> *mut u8 {
     if allocator.is_none() {
         FIRST_PAGE.map_to_new_frame();
         allocator = Some(Allocator {
@@ -71,11 +71,26 @@ pub unsafe fn allocate(size: usize, align: usize) -> *const u8 {
             current_page: FIRST_PAGE,
         });
     }
-    allocator.as_mut().expect("allocator must be initialized").allocate(size, align).0
+    allocator.as_mut().expect("allocator must be initialized").allocate(size, align).0 as *mut u8
 }
 
 pub unsafe fn deallocate(_ptr: *mut u8, _old_size: usize, _align: usize) {
     //print!("start: {:x}, size: {:x}, align: {:x}\n", _ptr as usize, _old_size, _align);
+}
+
+pub unsafe fn reallocate(_ptr: *mut u8, _old_size: usize, size: usize, align: usize) -> *mut u8 {
+    allocate(size, align)
+}
+
+pub unsafe fn reallocate_inplace(_ptr: *mut u8, _old_size: usize, _size: usize, 
+                                align: usize) -> usize {
+    0
+}
+
+pub fn stats_print() {}
+
+pub fn usable_size(size: usize, align: usize) -> usize {
+    size
 }
 
 impl Allocator {
@@ -213,7 +228,7 @@ impl PageTableField {
 
     unsafe fn is(&self, flags: PageTableFieldFlags) -> bool {
         
-        //print!("{:o}\n", self.0 as usize);
+        //print!("{:o}\n", self.0 as usize56+56+56+56+);
         PageTableFieldFlags::from_bits_truncate(*(self.0)).contains(flags)
     }
 
