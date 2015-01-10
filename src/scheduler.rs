@@ -1,10 +1,8 @@
-use core::prelude::*;
-use core::default::Default;
-use boxed::Box;
+use std::collections::RingBuf;
+use std::default::Default;
+use std::rt::heap::allocate;
 use fn_box::FnBox;
-use collections::RingBuf;
 use global::global;
-use alloc::heap::allocate;
 use spinlock::{Spinlock, SpinlockGuard};
 
 pub fn spawn<F, R>(f:F) -> Future<R> where F: FnOnce()->R, F:Send {
@@ -106,7 +104,7 @@ impl Thread {
     fn new<F>(f: F) -> Thread where F : FnOnce(), F: Send {
         Thread {
             state: ThreadState::New {
-                function: box f,
+                function: Box::new(f),
             }
         }
     }
