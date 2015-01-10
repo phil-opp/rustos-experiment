@@ -115,7 +115,7 @@
 // Don't link to std. We are std.
 #![no_std]
 
-#![deny(missing_docs)]
+//#![deny(missing_docs)]
 
 #[cfg(test)]
 #[macro_use]
@@ -186,7 +186,7 @@ pub mod bitflags;
 
 /* The Prelude. */
 
-//pub mod prelude;
+pub mod prelude;
 
 
 /* Primitive types */
@@ -235,7 +235,7 @@ pub mod bitflags;
 
 //pub mod dynamic_lib;
 //pub mod ffi;
-//pub mod fmt;
+pub mod fmt;
 //pub mod io;
 //pub mod os;
 //pub mod path;
@@ -258,7 +258,7 @@ pub mod bitflags;
 
 //#[path = "sys/common/mod.rs"] mod sys_common;
 
-//pub mod rt;
+pub mod rt;
 //mod failure;
 
 // Documentation for primitive types
@@ -280,7 +280,7 @@ mod std {
 
     //pub use sync; // used for select!()
     //pub use error; // used for try!()
-    //pub use fmt; // used for any formatting strings
+    pub use fmt; // used for any formatting strings
     //pub use io; // used for println!()
     pub use option; // used for bitflags!{}
     //pub use rt; // used for panic!()
