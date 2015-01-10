@@ -1,5 +1,8 @@
 use prelude::v1::*;
 
+// Reexport some functionality from liballoc.
+pub use alloc::heap;
+
 use any::Any;
 use fmt;
 
