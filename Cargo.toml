@@ -8,14 +8,11 @@ authors = ["Philipp Oppermann <dev@phil-opp.com>"]
 name = "rustos"
 crate-type = ["staticlib"]
 
-[dependencies.rlibc]
-git = "https://github.com/rust-lang/rlibc.git"
+[dependencies.std]
+path = "lib/libstd"
 
-[dependencies.os_collections]
-git = "https://PhilippOppermann@bitbucket.org/PhilippOppermann/os_collections.git"
-
-[dependencies.os_alloc]
-git = "https://PhilippOppermann@bitbucket.org/PhilippOppermann/os_alloc.git"
+[target.x86_64-unknown-linux-gnu.dependencies.frame_stack]
+path = "arch/x86_64/frame_stack"
 
 [dependencies.spinlock]
 git = "https://github.com/phil-opp/spinlock-rs.git"
