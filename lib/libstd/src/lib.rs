@@ -132,7 +132,7 @@ extern crate "collections" as core_collections;
 extern crate "rand" as core_rand;
 extern crate alloc;
 extern crate unicode;
-//extern crate libc;
+extern crate rlibc;
 
 // Make std testable by not duplicating lang items. See #2912
 #[cfg(test)] extern crate "std" as realstd;

@@ -4,6 +4,9 @@ name = "std"
 version = "0.0.1"
 authors = ["Philipp Oppermann <dev@phil-opp.com>"]
 
+[dependencies]
+rlibc = "*"
+
 [dependencies.alloc]
 path = "../liballoc"
 default-features = false
