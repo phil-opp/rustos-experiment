@@ -236,7 +236,7 @@ pub mod prelude;
 //pub mod dynamic_lib;
 //pub mod ffi;
 pub mod fmt;
-//pub mod io;
+pub mod io;
 //pub mod os;
 //pub mod path;
 //pub mod rand;
@@ -244,7 +244,7 @@ pub mod fmt;
 
 /* Common data structures */
 
-//pub mod collections;
+pub mod collections;
 
 /* Threads and communication */
 
