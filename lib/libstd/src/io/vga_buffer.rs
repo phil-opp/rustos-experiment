@@ -57,43 +57,25 @@ static mut std_writer: ScreenWriter = ScreenWriter{row:0, col: 0, foreground: Co
 pub fn clear_screen() {
    unsafe{std_writer.clear_screen()};
 }
-pub fn print_args(args: Arguments) {
-   match unsafe{fmt::write(&mut std_writer, args)} {
-      Err(_) => panic!("error writing to vga_buffer"),
-      _ => {},
-   }
+pub fn print_args(fmt: Arguments) {
+   write!(unsafe{&mut std_writer}, "{}", fmt);
+}
+pub fn println_args(fmt: Arguments) {
+   writeln!(unsafe{&mut std_writer}, "{}", fmt);
 }
 
-pub fn print_err(msg: &str, file_line: &(&'static str, uint)) {
+pub fn print_err_args(fmt: Arguments, file_line: &(&'static str, uint)) {
    unsafe{
       let foreground = std_writer.foreground;
       let background = std_writer.background;
       std_writer.foreground = Color::White;
       std_writer.background = Color::Red;
-      print!("Error: ");
-      match std_writer.write_str(msg) {
-         Err(_) => loop{},
-         _ => {},
-      }
-      print!(" in {} at line {}", file_line.0, file_line.1);
+      println!("Error: {} in {} at line {}", fmt, file_line.0, file_line.1);
       std_writer.foreground = foreground;
       std_writer.background = background;
    }
 }
 
-pub fn print_err_fmt(args: Arguments, file_line: &(&'static str, uint)) {
-   unsafe{
-      let foreground = std_writer.foreground;
-      let background = std_writer.background;
-      std_writer.foreground = Color::White;
-      std_writer.background = Color::Red;
-      print!("Error: ");
-      print_args(args);
-      print!(" in {} at line {}", file_line.0, file_line.1);
-      std_writer.foreground = foreground;
-      std_writer.background = background;
-   }
-}
 
 pub fn set_foreground(color:Color) {
    unsafe{std_writer.foreground = color};

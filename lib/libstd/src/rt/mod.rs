@@ -5,6 +5,7 @@ pub use alloc::heap;
 
 use any::Any;
 use fmt;
+use io::stdio;
 
 #[cfg(not(test))]
 /// Entry point of panic from the libcore crate.
@@ -22,6 +23,7 @@ pub extern fn rust_begin_unwind(msg: fmt::Arguments,
 /// the actual formatting into this shared place.
 #[inline(never)] #[cold]
 pub fn begin_unwind_fmt(msg: fmt::Arguments, file_line: &(&'static str, uint)) -> ! {
+    stdio::print_err_args(msg, file_line);
     loop{}
     //TODO
 
@@ -40,6 +42,8 @@ pub fn begin_unwind_fmt(msg: fmt::Arguments, file_line: &(&'static str, uint)) -
 /// This is the entry point of unwinding for panic!() and assert!().
 #[inline(never)] #[cold] // avoid code bloat at the call sites as much as possible
 pub fn begin_unwind<M: Any + Send>(msg: M, file_line: &(&'static str, uint)) -> ! {
+    //stdio::print_err_args(msg, file_line);
+    panic!("unimplemented")
     // Note that this should be the only allocation performed in this code path.
     // Currently this means that panic!() on OOM will invoke this code path,
     // but then again we're not really ready for panic on OOM anyway. If
@@ -50,6 +54,5 @@ pub fn begin_unwind<M: Any + Send>(msg: M, file_line: &(&'static str, uint)) -> 
     // see below for why we do the `Any` coercion here.
     // TODO
     //begin_unwind_inner(box msg, file_line)
-    loop{}
 }
 
