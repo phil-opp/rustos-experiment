@@ -249,7 +249,7 @@ pub mod collections;
 /* Threads and communication */
 
 //pub mod thread;
-//pub mod sync;
+pub mod sync;
 
 //#[cfg(unix)]
 //#[path = "sys/unix/mod.rs"] mod sys;
