@@ -1,18 +1,9 @@
 use std::ops::{Deref, DerefMut};
 use std::cell::{RefCell, Ref, RefMut};
-use std::mem;
 use thread::Thread;
 
 pub struct Data {
     pub current_thread: Thread,
-}
-
-impl Data{
-    pub unsafe fn swap_current_thread(&mut self, new: Thread) -> Thread {
-        let mut old = new;
-        mem::swap(&mut old, &mut self.current_thread);
-        old
-    }
 }
 
 pub fn borrow() -> Ref<'static, Data> {

@@ -2,6 +2,7 @@
 
 use std::collections::RingBuf;
 use std::default::Default;
+use std::mem;
 use std::rt::heap::allocate;
 use global::global;
 use spinlock::{Spinlock, SpinlockGuard};
@@ -20,7 +21,7 @@ pub fn spawn<F, R>(f:F) -> Future<R> where F: FnOnce()->R, F:Send {
 
 pub unsafe fn reschedule(current_rsp: uint) -> ! {
 	if global().scheduler.locked_by_current_thread() {
-		unsafe{pop_registers_and_iret(current_rsp)};
+		pop_registers_and_iret(current_rsp);
 	}
 
     // we must not be interrupted while using the scheduler stack
@@ -32,8 +33,8 @@ pub unsafe fn reschedule(current_rsp: uint) -> ! {
 
     	thread_local::borrow_mut().current_thread.state = ThreadState::Active{rsp: current_rsp};
 
-    	let current = unsafe{thread_local::borrow_mut()
-    		.swap_current_thread(global().scheduler.schedule())};
+    	let current = mem::replace(&mut thread_local::borrow_mut().current_thread,
+    		global().scheduler.schedule());
     	global().scheduler.park(current);
 
         start_current_thread()
@@ -78,8 +79,8 @@ fn start_current_thread() -> ! {
         unreachable!();
     }
 
-    let current_state = unsafe{thread_local::borrow_mut().current_thread.
-    	swap_state(ThreadState::Running)};
+    let current_state = mem::replace(&mut thread_local::borrow_mut().current_thread.state,
+    	ThreadState::Running);
     match current_state {
         ThreadState::Active{rsp} => {
             unsafe{pop_registers_and_iret(rsp)}

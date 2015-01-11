@@ -1,6 +1,5 @@
 use std::sync::atomic::{AtomicUint, ATOMIC_UINT_INIT, Ordering};
 use std::default::Default;
-use std::mem;
 use fn_box::FnBox;
 
 pub struct Thread {
@@ -40,12 +39,6 @@ impl Thread {
                 function: Box::new(f),
             }
         }
-    }
-
-    pub unsafe fn swap_state(&mut self, new: ThreadState) -> ThreadState {
-    	let mut old = new;
-    	mem::swap(&mut old, &mut self.state);
-    	old
     }
 }
 
