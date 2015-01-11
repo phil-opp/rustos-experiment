@@ -2,7 +2,7 @@
 
 use std::mem;
 use std::collections::RingBuf;
-use scheduler::GlobalScheduler;
+use GlobalScheduler;
 
 pub struct Global {
     pub scheduler: GlobalScheduler,

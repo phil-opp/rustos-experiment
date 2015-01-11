@@ -1,9 +1,16 @@
+#![feature(asm)]
+
+extern crate spinlock;
+
 use std::collections::RingBuf;
 use std::default::Default;
 use std::rt::heap::allocate;
 use fn_box::FnBox;
 use global::global;
 use spinlock::{Spinlock, SpinlockGuard};
+
+mod fn_box;
+mod global;
 
 pub fn spawn<F, R>(f:F) -> Future<R> where F: FnOnce()->R, F:Send {
     global().scheduler.spawn(f)
