@@ -9,7 +9,8 @@
 *.so
 *.a
 *.bc
+target/
+Cargo.lock
 **/target/
 **/Cargo.lock
-/bin
 *.sublime-workspace
