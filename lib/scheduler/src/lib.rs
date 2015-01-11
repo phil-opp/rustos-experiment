@@ -1,47 +1,48 @@
-#![feature(asm)]
-
-extern crate spinlock;
+#![feature(asm, unboxed_closures, unsafe_destructor)]
 
 use std::collections::RingBuf;
 use std::default::Default;
 use std::rt::heap::allocate;
-use fn_box::FnBox;
 use global::global;
 use spinlock::{Spinlock, SpinlockGuard};
+use thread::{Thread, ThreadState};
+use fn_box::FnBox;
 
+mod thread;
 mod fn_box;
 mod global;
+mod thread_local;
+mod spinlock;
 
 pub fn spawn<F, R>(f:F) -> Future<R> where F: FnOnce()->R, F:Send {
     global().scheduler.spawn(f)
 }
 
 pub unsafe fn reschedule(current_rsp: uint) -> ! {
+	if global().scheduler.locked_by_current_thread() {
+		unsafe{pop_registers_and_iret(current_rsp)};
+	}
+
     // we must not be interrupted while using the scheduler stack
-    ::disable_interrupts();
+    // TODO ::disable_interrupts();
     // switch stack so we can park current thread
     call_on_stack(inner, current_rsp, scheduler_stack_top());
 
     fn inner(current_rsp: uint) -> ! {
-        // try to park current thread
-        let current = Thread::from_rsp(current_rsp);
-        let scheduler = &global().scheduler;
 
-        let thread = match scheduler.try_park(current) {
-            Ok(()) => scheduler.schedule(),
-            Err(thread) => {
-                println!("thread list is locked. Maybe a thread was interrupted while holding
-                    the lock in spawn()?"); 
-                thread
-            },
-        };
-        start_thread(thread)
+    	thread_local::borrow_mut().current_thread.state = ThreadState::Active{rsp: current_rsp};
+
+    	let current = unsafe{thread_local::borrow_mut()
+    		.swap_current_thread(global().scheduler.schedule())};
+    	global().scheduler.park(current);
+
+        start_current_thread()
     }    
 }
 
 pub unsafe fn schedule() -> ! {
     // we must not be interrupted while using the scheduler stack
-    ::disable_interrupts();
+    // TODO ::disable_interrupts();
     // switch to scheduler stack (the stack of current thread could be to full/small)
     call_on_stack(inner, scheduler_stack_top());
     
@@ -52,16 +53,17 @@ pub unsafe fn schedule() -> ! {
 
     fn inner() -> ! {
         // TODO FIXME kill current thread and deallocate stack
-        start_thread(global().scheduler.schedule())
+        thread_local::borrow_mut().current_thread = global().scheduler.schedule();
+        start_current_thread()
     }
 }
 
-fn start_thread(thread: Thread) -> ! {
-    #[allow(improper_ctypes)]
-    extern {
-        fn pop_registers_and_iret(rsp: uint) -> !;
-    }
+#[allow(improper_ctypes)]
+extern {
+    fn pop_registers_and_iret(rsp: uint) -> !;
+}
 
+fn start_current_thread() -> ! {
     fn new_stack() -> uint {
         const NEW_STACK_SIZE: uint = 4096*2;
         let stack_bottom = unsafe{allocate(NEW_STACK_SIZE, 4096)};
@@ -70,21 +72,24 @@ fn start_thread(thread: Thread) -> ! {
     }
 
     fn invoke(function: Box<FnBox() + Send>) -> ! {
-        unsafe{::enable_interrupts()};
+        // TODO unsafe{::enable_interrupts()};
         function.call_once(());
         unsafe{asm!("int $$66" :::: "volatile")};
         unreachable!();
     }
 
-    match thread {
-        Thread{state: ThreadState::Active{rsp}} => {
+    let current_state = unsafe{thread_local::borrow_mut().current_thread.
+    	swap_state(ThreadState::Running)};
+    match current_state {
+        ThreadState::Active{rsp} => {
             unsafe{pop_registers_and_iret(rsp)}
         },
-        Thread{state: ThreadState::New{function}} => {
+        ThreadState::New{function} => {
             println!("new");
             let new_stack_top = new_stack();
             unsafe{call_on_stack(invoke, function, new_stack_top)}
         },
+        ThreadState::Running => panic!("current thread must not be running"),
     }
 }
 
@@ -102,43 +107,6 @@ unsafe fn call_on_stack<Arg>(function: fn(Arg) -> !, arg: Arg, stack_top: uint) 
 }
 
 pub struct Future<T>;
-
-pub struct Thread {
-    state: ThreadState,
-}
-
-impl Thread {
-    fn new<F>(f: F) -> Thread where F : FnOnce(), F: Send {
-        Thread {
-            state: ThreadState::New {
-                function: Box::new(f),
-            }
-        }
-    }
-
-    pub fn from_rsp(rsp: uint) -> Thread {
-        Thread {
-            state: ThreadState::Active {
-                rsp: rsp,
-            }
-        }
-    }
-}
-
-impl Default for Thread {
-    fn default() -> Thread {
-        Thread::new(|| print!("."))
-    }
-}
-
-enum ThreadState {
-    New {
-        function: Box<FnBox() + Send>,
-    },
-    Active {
-        rsp: uint,
-    }
-}
 
 pub struct GlobalScheduler {
     threads: Spinlock<RingBuf<Thread>>,
@@ -162,14 +130,15 @@ impl GlobalScheduler {
         Future/*::from_receiver(rx)*/
     }
 
-    fn try_park(&self, thread: Thread) -> Result<(), Thread> {
-        match self.threads.try_lock() {
-            Some(mut threads) => Ok(threads.push_back(thread)),
-            None => Err(thread),
-        }
+    fn park(&self, thread: Thread) {
+        self.threads.lock().push_back(thread)
     }
 
     fn schedule(&self) -> Thread {
         self.threads.lock().pop_front().unwrap_or_default()
+    }
+
+    fn locked_by_current_thread(&self) -> bool {
+    	self.threads.held_by_current_thread()
     }
 }

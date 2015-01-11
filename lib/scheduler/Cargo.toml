@@ -6,7 +6,3 @@ authors = ["Philipp Oppermann <dev@phil-opp.com>"]
 
 [dependencies.std]
 path = "../libstd"
-
-[dependencies.spinlock]
-git = "https://github.com/phil-opp/spinlock-rs.git"
-branch = "try_lock"
