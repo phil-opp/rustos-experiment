@@ -19,42 +19,59 @@ pub fn spawn<F, R>(f:F) -> Future<R> where F: FnOnce()->R, F:Send {
     global().scheduler.spawn(f)
 }
 
-pub unsafe fn reschedule(current_rsp: uint) -> ! {
-	if global().scheduler.locked_by_current_thread() {
-		pop_registers_and_iret(current_rsp);
-	}
+/// Can we park the current thread or does it hold an important lock or borrows thread local data
+fn current_thread_parkable() -> bool {
+    global().scheduler.locked_by_current_thread() || 
+    thread_local::data().try_borrow_mut().map_or(true, |d| !d.parkable)
+}
 
+pub unsafe fn reschedule(current_rsp: uint) -> ! {
+    if !current_thread_parkable() {
+        pop_registers_and_iret(current_rsp)
+    } else {
+        inner(current_rsp)
+    }
+
+    /* OLD */
     // we must not be interrupted while using the scheduler stack
     // TODO ::disable_interrupts();
     // switch stack so we can park current thread
-    call_on_stack(inner, current_rsp, scheduler_stack_top());
+    //call_on_stack(inner, current_rsp, scheduler_stack_top());
 
     fn inner(current_rsp: uint) -> ! {
 
-    	thread_local::borrow_mut().current_thread.state = ThreadState::Active{rsp: current_rsp};
+        let current_thread = &mut thread_local::data().borrow_mut().current_thread;
+        let scheduler = &global().scheduler;
 
-    	let current = mem::replace(&mut thread_local::borrow_mut().current_thread,
-    		global().scheduler.schedule());
-    	global().scheduler.park(current);
+        current_thread.state = ThreadState::Active{rsp: current_rsp};
+
+        let current = mem::replace(current_thread, scheduler.schedule());
+        scheduler.park(current);
 
         start_current_thread()
     }    
 }
 
 pub unsafe fn schedule() -> ! {
+    assert!(current_thread_parkable());
+    inner();
+    /* OLD */
     // we must not be interrupted while using the scheduler stack
     // TODO ::disable_interrupts();
     // switch to scheduler stack (the stack of current thread could be to full/small)
-    call_on_stack(inner, scheduler_stack_top());
+    //call_on_stack(inner, scheduler_stack_top());
     
+    /*
     unsafe fn call_on_stack(function: fn() -> !, stack_top: uint) -> ! {
         asm!("call $0;" :: "r"(function), "{rsp}"(stack_top) :: "intel", "volatile");
         panic!("diverging fn returned");
     }
+    */
 
     fn inner() -> ! {
-        // TODO FIXME kill current thread and deallocate stack
-        thread_local::borrow_mut().current_thread = global().scheduler.schedule();
+        let old = mem::replace(&mut thread_local::data().borrow_mut().current_thread, 
+            global().scheduler.schedule());
+        // TODO FIXME kill old thread and deallocate stack
         start_current_thread()
     }
 }
@@ -79,8 +96,8 @@ fn start_current_thread() -> ! {
         unreachable!();
     }
 
-    let current_state = mem::replace(&mut thread_local::borrow_mut().current_thread.state,
-    	ThreadState::Running);
+    let current_state = mem::replace(&mut thread_local::data().borrow_mut().current_thread.state,
+        ThreadState::Running);
     match current_state {
         ThreadState::Active{rsp} => {
             unsafe{pop_registers_and_iret(rsp)}
@@ -94,13 +111,16 @@ fn start_current_thread() -> ! {
     }
 }
 
+/*
 fn scheduler_stack_top() -> uint {
     const SCHEDULER_STACK_SIZE: uint = 4096;
     static SCHEDULER_STACK: [u8; SCHEDULER_STACK_SIZE] = [0; SCHEDULER_STACK_SIZE];
 
     &SCHEDULER_STACK as *const [u8; 4096] as uint + SCHEDULER_STACK_SIZE
 }
+*/
 
+#[inline(never)]
 unsafe fn call_on_stack<Arg>(function: fn(Arg) -> !, arg: Arg, stack_top: uint) -> ! {
     asm!("call $0;" :: "r"(function), "{rdi}"(arg), "{rsp}"(stack_top) :
         : "intel", "volatile");
@@ -140,6 +160,6 @@ impl GlobalScheduler {
     }
 
     fn locked_by_current_thread(&self) -> bool {
-    	self.threads.held_by_current_thread()
+        self.threads.held_by_current_thread()
     }
 }
