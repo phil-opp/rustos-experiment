@@ -10,9 +10,9 @@ pub struct Thread {
 pub struct ThreadId(usize);
 
 impl ThreadId {
-	pub fn as_usize(&self) -> usize {
-		self.0
-	}
+    pub fn as_usize(&self) -> usize {
+        self.0
+    }
 }
 
 pub enum ThreadState {
@@ -28,13 +28,13 @@ pub enum ThreadState {
 impl Thread {
 
     fn next_id() -> ThreadId {
-    	static NEXT_ID: AtomicUint = ATOMIC_UINT_INIT;
-    	ThreadId(NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1) // start at id 1
+        static NEXT_ID: AtomicUint = ATOMIC_UINT_INIT;
+        ThreadId(NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1) // start at id 1
     }
     
     pub fn new<F>(f: F) -> Thread where F : FnOnce(), F: Send {
         Thread {
-        	id: Thread::next_id(),
+            id: Thread::next_id(),
             state: ThreadState::New {
                 function: Box::new(f),
             }
