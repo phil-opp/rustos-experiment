@@ -7,6 +7,7 @@ pub struct Thread {
     pub state: ThreadState,
 }
 
+#[derive(Show)]
 pub struct ThreadId(usize);
 
 impl ThreadId {
@@ -29,7 +30,7 @@ impl Thread {
 
     fn next_id() -> ThreadId {
         static NEXT_ID: AtomicUint = ATOMIC_UINT_INIT;
-        ThreadId(NEXT_ID.fetch_add(1, Ordering::Relaxed) + 1) // start at id 1
+        ThreadId(NEXT_ID.fetch_add(1, Ordering::Relaxed) + 2) // start at id 2
     }
     
     pub fn new<F>(f: F) -> Thread where F : FnOnce(), F: Send {
@@ -44,6 +45,6 @@ impl Thread {
 
 impl Default for Thread {
     fn default() -> Thread {
-        Thread::new(|| print!("."))
+        Thread::new(|| println!("default"))
     }
 }
