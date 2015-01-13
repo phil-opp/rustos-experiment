@@ -22,7 +22,7 @@ pub fn spawn<F, R>(f:F) -> Future<R> where F: FnOnce()->R, F:Send {
 /// Can we park the current thread or does it hold an important lock or borrows thread local data
 fn current_thread_parkable() -> bool {
     global().scheduler.locked_by_current_thread() || 
-    thread_local::data().try_borrow_mut().map_or(true, |d| !d.parkable)
+    thread_local::data().try_borrow_mut().map_or(false, |d| d.parkable)
 }
 
 pub unsafe fn init() {
