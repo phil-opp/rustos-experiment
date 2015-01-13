@@ -29,7 +29,7 @@ pub fn main(multiboot: *const multiboot::Information) {
     scheduler::spawn(|| print!("I'm #1!\n"));
 
     fn test(name: &str) {
-        loop {
+        for j in 0..20 {
             let mut x = 0u;
             for i in range(0,100000) {
                 x = i;
@@ -45,10 +45,9 @@ pub fn main(multiboot: *const multiboot::Information) {
     scheduler::spawn(|| test("5"));
     scheduler::spawn(|| test("6"));
     
-    test("m");
-
-
-    loop{}
+    loop{
+        test("m");
+    }
     panic!("end of os!");
 }
 
