@@ -1,13 +1,10 @@
 #![feature(asm, lang_items, unboxed_closures)]
 
 extern crate spinlock;
+extern crate scheduler;
 
 mod multiboot;
 mod init;
-mod fn_box;
-mod scheduler;
-mod global;
-
 
 #[no_mangle]
 pub fn main(multiboot: *const multiboot::Information) {
@@ -25,6 +22,7 @@ pub fn main(multiboot: *const multiboot::Information) {
     print!("test");
     print!("test\n");
     println!("newline {}", x);
+
 
     scheduler::spawn(|| print!("I'm #1!\n"));
 
@@ -100,6 +98,10 @@ pub extern "C" fn interrupt_handler(interrupt_number: u64, error_code: u64, rsp:
         _ => panic!("unknown interrupt! number: {}, error_code: {:x}",interrupt_number, error_code),
     };
     unsafe{send_eoi(interrupt_number)};
+
+    //TODO enable interrupts
+
+    //TODO move interrupt numbers to own crate (yield() etc)
 
     match interrupt_number {
         32 => unsafe{scheduler::reschedule(rsp)},
