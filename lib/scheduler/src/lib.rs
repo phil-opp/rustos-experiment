@@ -25,6 +25,10 @@ fn current_thread_parkable() -> bool {
     thread_local::data().try_borrow_mut().map_or(true, |d| !d.parkable)
 }
 
+pub unsafe fn init() {
+    global::init();
+}
+
 pub unsafe fn reschedule(current_rsp: uint) -> ! {
     if !current_thread_parkable() {
         pop_registers_and_iret(current_rsp)

@@ -9,9 +9,11 @@ mod init;
 #[no_mangle]
 pub fn main(multiboot: *const multiboot::Information) {
 
-    unsafe{init::frame_stack(multiboot)};
-    global::init();
-    unsafe{enable_interrupts()};
+    unsafe{
+        init::frame_stack(multiboot);
+        scheduler::init();
+        enable_interrupts();
+    };
 
     print!("test\n\niuaeiae");
     let x = Box::new(5i);
