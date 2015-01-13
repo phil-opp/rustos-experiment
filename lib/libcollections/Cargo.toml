@@ -1,0 +1,12 @@
+[package]
+name = "collections"
+version = "0.0.1"
+authors = [ "you@example.com" ]
+
+[lib]
+name = "collections"
+
+[dependencies.alloc]
+path = "../liballoc"
+default-features = false
+features = ["external_crate"]

@@ -1,0 +1,8 @@
+[package]
+
+name = "external"
+version = "0.0.1"
+authors = ["Philipp Oppermann <dev@phil-opp.com>"]
+
+[dependencies.frame_stack]
+path = "../frame_stack"

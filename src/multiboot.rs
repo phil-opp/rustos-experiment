@@ -1,5 +1,4 @@
-use core::prelude::*;
-use core::intrinsics::offset;
+use std::intrinsics::offset;
 
 #[packed]
 #[allow(dead_code)]
@@ -96,7 +95,8 @@ impl MemoryAreaIter {
     }
 }
 
-impl Iterator<&'static MemoryArea> for MemoryAreaIter {
+impl Iterator for MemoryAreaIter {
+    type Item = &'static MemoryArea;
     fn next(&mut self) -> Option<&'static MemoryArea> {
         if self.current_area > self.last_area {
             None

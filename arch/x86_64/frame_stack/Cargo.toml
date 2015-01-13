@@ -1,0 +1,9 @@
+[package]
+
+name = "frame_stack"
+version = "0.0.1"
+authors = ["Philipp Oppermann <dev@phil-opp.com>"]
+
+[dependencies.spinlock]
+git = "https://github.com/phil-opp/spinlock-rs.git"
+branch = "try_lock"

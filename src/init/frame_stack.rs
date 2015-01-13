@@ -1,6 +1,5 @@
-extern crate "os_x86_64_frame_stack" as frame_stack;
+extern crate frame_stack;
 
-use core::prelude::*;
 use self::frame_stack::Frame;
 
 extern {
@@ -61,12 +60,16 @@ pub unsafe fn init_frame_stack(multiboot: *const ::multiboot::Information) {
             }
         }
     }
-}
-
-unsafe fn map_to_p1_table(p2_index: u32, to: Frame) { 
-    *((0o177777_777_777_000_001_0000 + (p2_index as u64)*8) as *mut u64) = (to.number as u64 << 12) | 1;
-}
-unsafe fn map_p1_entries(p2_index: u32, p1_index: u32, to: Frame) {
-    let entry = (0o177777_777_000_001_000_0000 | (p2_index as u64 << 12) | (p1_index as u64 * 8)) as *mut u64;
-    *entry = (to.number as u64 << 12) | 3;
+    
+    unsafe fn map_to_p1_table(p2_index: u32, frame: Frame) {
+        let p1_field: *mut u64 = (0o177777_777_777_000_001_0000 + (p2_index as u64) * 8) 
+            as *mut u64;
+        *p1_field = ((frame.number as u64) << 12) | 1;
+    }
+    
+    unsafe fn map_p1_entries(p2_index: u32, p1_index: u32, to: Frame) {
+        let entry: *mut u64 = (0o177777_777_000_001_000_0000 | ((p2_index as u64) << 12) 
+            | (p1_index as u64 * 8)) as *mut u64;
+        *entry = ((to.number as u64) << 12) | 3;
+    }
 }

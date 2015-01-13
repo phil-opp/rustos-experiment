@@ -11,14 +11,14 @@ os.iso: isofiles/boot/os.bin
 
 lib_rustos = $(shell ls target | grep librustos | head -1)
 
-isofiles/boot/os.bin: rustos src/assembly/x86_64/linker.ld bin/loader.o bin/handlers.o 
-	@ld -T src/assembly/x86_64/linker.ld bin/loader.o bin/handlers.o target/$(lib_rustos) -o isofiles/boot/os.bin
+isofiles/boot/os.bin: rustos arch/x86_64/assembly/linker.ld bin/loader.o bin/handlers.o 
+	@ld -T arch/x86_64/assembly/linker.ld bin/loader.o bin/handlers.o target/$(lib_rustos) -o isofiles/boot/os.bin
 
-bin/loader.o: src/assembly/x86_64/loader.asm
-	@nasm -felf64 src/assembly/x86_64/loader.asm -o bin/loader.o
+bin/loader.o: arch/x86_64/assembly/loader.asm
+	@nasm -felf64 arch/x86_64/assembly/loader.asm -o bin/loader.o
 
-bin/handlers.o: src/assembly/x86_64/handlers.asm
-	@nasm -felf64 src/assembly/x86_64/handlers.asm -o bin/handlers.o
+bin/handlers.o: arch/x86_64/assembly/handlers.asm
+	@nasm -felf64 arch/x86_64/assembly/handlers.asm -o bin/handlers.o
 
 rustos:
 	@cargo build	

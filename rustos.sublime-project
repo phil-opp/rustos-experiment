@@ -4,6 +4,11 @@
 		{
 			"follow_symlinks": true,
 			"path": "src"
+		},
+		{
+			"follow_symlinks": true,
+			"path": "lib",
+			"folder_exclude_patterns": ["rust", "**/target"],
 		}
 	]
 }

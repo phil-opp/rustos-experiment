@@ -6,14 +6,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#![allow(dead_code)]
-
 use core::prelude::*;
 use core::intrinsics::transmute;
-use core::iter;
 use core::fmt;
-use core::fmt::{FormatWriter, Error};
+use core::fmt::{Writer, Error};
 
+#[allow(dead_code)]
 pub enum Color {
    Black      = 0,
    Blue       = 1,
@@ -32,64 +30,43 @@ pub enum Color {
    Yellow     = 14,
    White      = 15
 }
-impl Copy for Color{}
+impl Copy for Color {}
 
-static SCREEN_ADDR: uint = 0xb8000;
-static MAX_ROW: uint = 25;
-static MAX_COLUMN: uint = 80;
+static SCREEN_ADDR: usize = 0xb8000;
+static MAX_ROW: u32 = 25;
+static MAX_COLUMN: u32 = 80;
 
-pub struct Writer {
-   row: uint,
-   col: uint,
+pub struct ScreenWriter {
+   row: u32,
+   col: u32,
    foreground: Color,
    background: Color,
 }
 
 #[packed]
+#[allow(dead_code)]
 struct ScreenCharacter {
    character: u8,
    color: u8,
 }
+impl Copy for ScreenCharacter{}
 
-static mut std_writer: Writer = Writer{row:0, col: 0, foreground: Color::Green, 
+static mut std_writer: ScreenWriter = ScreenWriter{row:0, col: 0, foreground: Color::Green, 
    background: Color::Black};
 
 pub fn clear_screen() {
    unsafe{std_writer.clear_screen()};
 }
 pub fn print_args(args: fmt::Arguments) {
-   match unsafe{fmt::write(&mut std_writer, args)} {
-      Err(_) => panic!("error writing to vga_buffer"),
-      _ => {},
-   }
+   unsafe{std_writer.write_fmt(args)};
 }
-
-pub fn print_err(msg: &str, file_line: &(&'static str, uint)) {
+pub fn print_err(args: fmt::Arguments) {
    unsafe{
       let foreground = std_writer.foreground;
       let background = std_writer.background;
       std_writer.foreground = Color::White;
       std_writer.background = Color::Red;
-      print!("Error: ");
-      match std_writer.write(msg.as_bytes()) {
-         Err(_) => loop{},
-         _ => {},
-      }
-      print!(" in {} at line {}", file_line.0, file_line.1);
-      std_writer.foreground = foreground;
-      std_writer.background = background;
-   }
-}
-
-pub fn print_err_fmt(args: fmt::Arguments, file_line: &(&'static str, uint)) {
-   unsafe{
-      let foreground = std_writer.foreground;
-      let background = std_writer.background;
-      std_writer.foreground = Color::White;
-      std_writer.background = Color::Red;
-      print!("Error: ");
       print_args(args);
-      print!(" in {} at line {}", file_line.0, file_line.1);
       std_writer.foreground = foreground;
       std_writer.background = background;
    }
@@ -111,35 +88,32 @@ impl ScreenCharacter {
       }
    }
 }
-impl Copy for ScreenCharacter {}
 
-impl FormatWriter for Writer {
-   fn write(&mut self, msg: &[u8]) -> Result<(),Error> {
-      for &byte in msg.iter() {
-         self.print_byte(byte);
+impl Writer for ScreenWriter {
+   fn write_str(&mut self, s: &str) -> Result<(),Error> {
+      for byte in s.as_bytes().iter() {
+         self.print_byte(*byte);
       }
-      self.move_cursor();
       Ok::<(), Error>(())
    }
 }
 
-impl Writer {
+impl ScreenWriter {
    #[inline]
-   fn screen_char_at(pos:uint) -> &'static ScreenCharacter {
-      unsafe{transmute::<uint,&ScreenCharacter>(SCREEN_ADDR + pos * 2)}
+   fn screen_char_at(pos: u32) -> &'static ScreenCharacter {
+      unsafe{transmute::<_,&ScreenCharacter>(SCREEN_ADDR + pos as usize * 2)}
    }
    #[inline]
-   fn mut_screen_char_at(pos:uint) -> &'static mut ScreenCharacter {
-      unsafe{transmute::<uint,&mut ScreenCharacter>(SCREEN_ADDR + pos * 2)}
+   fn mut_screen_char_at(pos: u32) -> &'static mut ScreenCharacter {
+      unsafe{transmute::<_ ,&mut ScreenCharacter>(SCREEN_ADDR + pos as usize * 2)}
    }
 
    fn clear_screen(&mut self) {
-      for line in iter::range(0, MAX_ROW) {
+      for line in (0..MAX_ROW) {
          self.clear_line(line);
       }
       self.row = 0;
       self.col = 0;
-      self.move_cursor();
    }
 
    #[inline]
@@ -158,7 +132,7 @@ impl Writer {
          byte => {
             let pos = self.row * MAX_COLUMN + self.col;
             
-            let screen_char = Writer::mut_screen_char_at(pos);
+            let screen_char = ScreenWriter::mut_screen_char_at(pos);
             *screen_char = ScreenCharacter::new(byte as u8, self.foreground, self.background);
 
             self.col += 1;
@@ -170,7 +144,7 @@ impl Writer {
    }
 
 
-   fn clear_line(&mut self, row: uint) {
+   fn clear_line(&mut self, row: u32) {
       let c = self.col;
       let r = self.row;
       self.col = 0;
@@ -182,9 +156,9 @@ impl Writer {
 
    fn clear_rem_line(&mut self) {
       let rpos = self.row * MAX_COLUMN;
-      for i in iter::range(self.col, MAX_COLUMN) {
+      for i in (self.col..MAX_COLUMN) {
          let pos = rpos + i;
-         let screen_char = Writer::mut_screen_char_at(pos);
+         let screen_char = ScreenWriter::mut_screen_char_at(pos);
          *screen_char = ScreenCharacter::new(' ' as u8, self.foreground, self.background);
       }
    }
@@ -200,40 +174,16 @@ impl Writer {
    }
 
    fn shift_rows_up(&mut self) {
-      for r in iter::range(0, MAX_ROW-1) {
-         for c in iter::range(0, MAX_COLUMN) {
+      for r in (0..MAX_ROW-1) {
+         for c in (0..MAX_COLUMN) {
             let new_pos = r * MAX_COLUMN + c;
             let old_pos = (r+1) * MAX_COLUMN + c;
 
-            let new_field = Writer::mut_screen_char_at(new_pos);
-            let old_field = Writer::screen_char_at(old_pos);
+            let new_field = ScreenWriter::mut_screen_char_at(new_pos);
+            let old_field = ScreenWriter::screen_char_at(old_pos);
             *new_field = *old_field;
          }
       }
       self.clear_line(MAX_ROW - 1);
-   }
-
-   fn move_cursor(&mut self) {
-      let pos = self.row * MAX_COLUMN + self.col;
-      unsafe {
-         asm!("
-            mov al, 0xF
-            mov dx, 0x3D4
-            out dx, al
-
-            mov ax, bx
-            mov dx, 0x3D5
-            out dx, al
-
-            mov al, 0xE
-            mov dx, 0x3D4
-            out dx, al
-
-            mov ax, bx
-            shr ax, 8
-            mov dx, 0x3D5
-            out dx, al
-         " : : "{bx}" (pos) : "al", "dx": "intel");
-      }
    }
 }
