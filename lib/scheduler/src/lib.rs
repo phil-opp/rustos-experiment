@@ -27,6 +27,10 @@ fn current_thread_parkable() -> bool {
 
 pub unsafe fn init() {
     global::init();
+    thread_local::init(thread_local::Data{
+        current_thread: Thread::new(|| println!(".")),
+        parkable: true,
+    })
 }
 
 pub unsafe fn reschedule(current_rsp: uint) -> ! {
