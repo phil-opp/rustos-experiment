@@ -130,7 +130,8 @@ impl<T> Spinlock<T>
 
     fn obtain_lock(&self)
     {
-        let current_id = thread_local::data().borrow().current_thread.id.as_usize();
+        let current_id = thread_local::data().try_borrow().expect("thread local data mutably \
+            borrowed while obtaining lock").current_thread.id.as_usize();
         while self.lock.compare_and_swap(0, current_id, Ordering::SeqCst) != 0
         {
             // Do nothing
@@ -162,7 +163,9 @@ impl<T> Spinlock<T>
     }
 
     pub fn held_by_current_thread(&self) -> bool {
-        let current_thread_id = thread_local::data().borrow().current_thread.id.as_usize();
+        let current_thread_id = thread_local::data().try_borrow().expect("thread local data \
+            mutably borrowed while spinlock::held_by_current_thread")
+            .current_thread.id.as_usize();
         self.lock.load(Ordering::Relaxed) == current_thread_id
     }
 }
