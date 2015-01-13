@@ -28,7 +28,10 @@ fn current_thread_parkable() -> bool {
 pub unsafe fn init() {
     global::init();
     thread_local::init(thread_local::Data{
-        current_thread: Thread::new(|| println!(".")),
+        current_thread: Thread{
+            id: mem::transmute(1us),
+            state: ThreadState::Running,
+        },
         parkable: true,
     })
 }
@@ -103,8 +106,7 @@ fn start_current_thread() -> ! {
         unsafe{asm!("int $$66" :::: "volatile")};
         unreachable!();
     }
-
-    let current_state = mem::replace(&mut thread_local::data().borrow_mut().current_thread.state,
+  let current_state = mem::replace(&mut thread_local::data().borrow_mut().current_thread.state,
         ThreadState::Running);
     match current_state {
         ThreadState::Active{rsp} => {
