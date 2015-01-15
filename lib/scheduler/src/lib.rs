@@ -8,6 +8,7 @@ use global::global;
 use spinlock::Spinlock;
 use thread::{Thread, ThreadState};
 use fn_box::FnBox;
+use std::fmt;
 
 mod thread;
 mod fn_box;
@@ -17,6 +18,12 @@ mod spinlock;
 
 #[derive(Copy)]
 pub struct StackPointer(usize);
+
+impl fmt::LowerHex for StackPointer {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 pub fn spawn<F, R>(f:F) -> Future<R> where F: FnOnce()->R, F:Send {
     global().scheduler.spawn(f)

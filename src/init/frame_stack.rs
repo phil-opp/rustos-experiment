@@ -18,7 +18,7 @@ pub unsafe fn init_frame_stack(multiboot: *const ::multiboot::Information) {
     // map frame stack to 2mb behind kernel
     map_p1_entries(0, 0, stack_start_frame);
     // map p1 entries
-    for i in range(0, 512) {
+    for i in 0..512 {
         map_p1_entries(0, i, Frame{
             number: stack_start_frame.number + i,
         });
@@ -40,7 +40,7 @@ pub unsafe fn init_frame_stack(multiboot: *const ::multiboot::Information) {
     };
 
     for area in areas {
-        for frame in range(area.base_addr >> 12, (area.base_addr+area.length) >> 12).map(
+        for frame in ((area.base_addr >> 12)..((area.base_addr+area.length) >> 12)).map(
             |frame_number| Frame{number: frame_number as u32}) {
             if frame >= first_free_frame {
                 if last_mapped_p1_table < p1_tables_required {
@@ -48,7 +48,7 @@ pub unsafe fn init_frame_stack(multiboot: *const ::multiboot::Information) {
                     last_mapped_p1_table += 1;
                     map_to_p1_table(last_mapped_p1_table, frame);
                     // map p1 entries
-                    for i in range(0, 512) {
+                    for i in 0..512 {
                         map_p1_entries(last_mapped_p1_table, i, Frame{
                             number: stack_start_frame.number + last_mapped_p1_table*512 + i,
                         });

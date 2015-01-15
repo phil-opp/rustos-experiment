@@ -3,6 +3,8 @@
 extern crate spinlock;
 extern crate scheduler;
 
+use scheduler::StackPointer;
+
 mod multiboot;
 mod init;
 
@@ -16,7 +18,7 @@ pub fn main(multiboot: *const multiboot::Information) {
     };
 
     print!("test\n\niuaeiae");
-    let x = Box::new(5i);
+    let x = Box::new(5);
 
     let y = 0xb8000 as *mut u64;
     unsafe{*y = 0xffffffffffffffff};
@@ -29,9 +31,9 @@ pub fn main(multiboot: *const multiboot::Information) {
     scheduler::spawn(|| print!("I'm #1!\n"));
 
     fn test(name: &str) {
-        for j in 0..20 {
-            let mut x = 0u;
-            for i in range(0,100000) {
+        for _ in 0..20 {
+            let mut x = 0;
+            for i in 0..100000 {
                 x = i;
             }
             print!("{}", name);
@@ -88,7 +90,7 @@ unsafe fn send_eoi(interrupt_number: u64) {
 }
 
 #[no_mangle]
-pub extern "C" fn interrupt_handler(interrupt_number: u64, error_code: u64, rsp:uint) {
+pub extern "C" fn interrupt_handler(interrupt_number: u64, error_code: u64, sp: StackPointer) {
     match interrupt_number {
         13 if error_code != 0 => panic!(
             "General Protection Fault: Segment error at segment 0x{:x}", error_code),
@@ -105,15 +107,15 @@ pub extern "C" fn interrupt_handler(interrupt_number: u64, error_code: u64, rsp:
     //TODO move interrupt numbers to own crate (yield() etc)
 
     match interrupt_number {
-        32 => unsafe{scheduler::reschedule(rsp)},
+        32 => unsafe{scheduler::reschedule(sp)},
         66 => unsafe{scheduler::schedule()},
         _ => {},
     }    
 }
 
 #[no_mangle]
-pub extern "C" fn pagefault_handler(address: u64, error_code: u64, rsp:uint) {
-    panic!("page fault: address: {:x}, error_code: {:b}, rsp: {:x}", address, error_code, rsp);
+pub extern "C" fn pagefault_handler(address: u64, error_code: u64, sp: StackPointer) {
+    panic!("page fault: address: {:x}, error_code: {:b}, sp: {:x}", address, error_code, sp);
 }
 
 #[cfg(not(test))]
