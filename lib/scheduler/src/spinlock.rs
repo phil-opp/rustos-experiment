@@ -68,7 +68,7 @@
 //! assert_eq!(answer, numthreads);
 //! ```
 
-use std::sync::atomic::{AtomicUint, Ordering, ATOMIC_UINT_INIT};
+use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
 use std::cell::UnsafeCell;
 use std::ops::{Drop, Deref, DerefMut};
 use thread_local;
@@ -76,7 +76,7 @@ use thread_local;
 /// A wrapper for the data giving access in a thread-safe manner
 pub struct Spinlock<T>
 {
-    lock: AtomicUint,
+    lock: AtomicUsize,
     data: UnsafeCell<T>,
 }
 
@@ -85,7 +85,7 @@ pub struct Spinlock<T>
 /// When the guard falls out of scope it will release the lock.
 pub struct SpinlockGuard<'a, T:'a>
 {
-    lock: &'a AtomicUint,
+    lock: &'a AtomicUsize,
     data: &'a mut T,
 }
 
@@ -109,12 +109,9 @@ pub type StaticSpinlock = Spinlock<()>;
 
 /// A initializer for StaticSpinlock, containing no data.
 pub const STATIC_SPINLOCK_INIT: StaticSpinlock = Spinlock {
-    lock: ATOMIC_UINT_INIT,
+    lock: ATOMIC_USIZE_INIT,
     data: UnsafeCell { value: () },
 };
-
-#[deprecated = "renamed to STATIC_SPINLOCK_INIT"]
-pub const INIT_STATIC_SPINLOCK: StaticSpinlock = STATIC_SPINLOCK_INIT;
 
 impl<T> Spinlock<T>
 {
@@ -123,7 +120,7 @@ impl<T> Spinlock<T>
     {
         Spinlock
         {
-            lock: ATOMIC_UINT_INIT,
+            lock: ATOMIC_USIZE_INIT,
             data: UnsafeCell::new(user_data),
         }
     }

@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 use std::mem;
-use std::collections::RingBuf;
 use GlobalScheduler;
 
 pub struct Global {

@@ -1,6 +1,7 @@
-use std::sync::atomic::{AtomicUint, ATOMIC_UINT_INIT, Ordering};
+use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 use std::default::Default;
 use fn_box::FnBox;
+use StackPointer;
 
 pub struct Thread {
     pub id: ThreadId,
@@ -21,7 +22,7 @@ pub enum ThreadState {
         function: Box<FnBox() + Send>,
     },
     Active {
-        rsp: uint,
+        stack_pointer: StackPointer,
     },
     Running,
 }
@@ -29,7 +30,7 @@ pub enum ThreadState {
 impl Thread {
 
     fn next_id() -> ThreadId {
-        static NEXT_ID: AtomicUint = ATOMIC_UINT_INIT;
+        static NEXT_ID: AtomicUsize = ATOMIC_USIZE_INIT;
         ThreadId(NEXT_ID.fetch_add(1, Ordering::Relaxed) + 2) // start at id 2
     }
     

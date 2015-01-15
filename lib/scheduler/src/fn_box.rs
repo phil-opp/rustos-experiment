@@ -50,18 +50,18 @@ fn can_be_called() {
 
 #[test]
 fn can_be_called_with_args() {
-  let f: Box<FnBox(uint)> = Box::new(move |:x: uint| { assert_eq!(x, 3) });
+  let f: Box<FnBox(usize)> = Box::new(move |:x: usize| { assert_eq!(x, 3) });
   f.call_box((3,));
 }
 
 #[test]
 fn can_return_values() {
-  let f: Box<FnBox() -> uint> = Box::new(move |:| 3);
+  let f: Box<FnBox() -> usize> = Box::new(move |:| 3);
   assert_eq!(f.call_box(()), 3);
 }
 
 #[test]
 fn everything() {
-  let f: Box<FnBox(_) -> _> = Box::new(move |:x: uint| x + 1);
+  let f: Box<FnBox(_) -> _> = Box::new(move |:x: usize| x + 1);
   assert_eq!(f.call_box((3,)), 4);
 }

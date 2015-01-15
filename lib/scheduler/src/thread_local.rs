@@ -1,4 +1,3 @@
-use std::ops::{Deref, DerefMut};
 use std::cell::RefCell;
 use std::mem;
 use thread::Thread;
@@ -24,6 +23,6 @@ unsafe fn get_data_ptr() -> *const RefCell<Data> {
 }
 #[cfg(target_arch = "x86_64")]
 unsafe fn set_data_ptr(data: Box<RefCell<Data>>) {
-    let mut data_ptr: *const RefCell<Data> = mem::transmute(data);
+    let data_ptr: *const RefCell<Data> = mem::transmute(data);
     asm!("movq $0, %fs:0" :: "r"(data_ptr) :: "volatile");
 }

@@ -5,7 +5,7 @@ use std::default::Default;
 use std::mem;
 use std::rt::heap::allocate;
 use global::global;
-use spinlock::{Spinlock, SpinlockGuard};
+use spinlock::Spinlock;
 use thread::{Thread, ThreadState};
 use fn_box::FnBox;
 
@@ -14,6 +14,9 @@ mod fn_box;
 mod global;
 mod thread_local;
 mod spinlock;
+
+#[derive(Copy)]
+pub struct StackPointer(usize);
 
 pub fn spawn<F, R>(f:F) -> Future<R> where F: FnOnce()->R, F:Send {
     global().scheduler.spawn(f)
@@ -36,12 +39,12 @@ pub unsafe fn init() {
     })
 }
 
-pub unsafe fn reschedule(current_rsp: uint) {
+pub unsafe fn reschedule(current_stack_pointer: StackPointer) {
     if current_thread_parkable() {
         if let Some(new_thread) = global().scheduler.schedule() {
 
             let mut old_thread = replace_current_thread(new_thread);
-            old_thread.state = ThreadState::Active{rsp: current_rsp};
+            old_thread.state = ThreadState::Active{stack_pointer: current_stack_pointer};
             global().scheduler.park(old_thread);
 
             start_current_thread()    
@@ -56,7 +59,7 @@ pub unsafe fn schedule() -> ! {
         } else {
             Default::default()
         };
-        let old_thread = replace_current_thread(new_thread);
+        let _old_thread = replace_current_thread(new_thread);
         // TODO FIXME kill old thread and deallocate stack
         start_current_thread()
     }
@@ -72,20 +75,20 @@ fn replace_current_thread(new_thread: Thread) -> Thread {
 
 #[allow(improper_ctypes)]
 extern {
-    fn pop_registers_and_iret(rsp: uint) -> !;
+    fn pop_registers_and_iret(stack_pointer: StackPointer) -> !;
 }
 
 fn start_current_thread() -> ! {
-    fn new_stack() -> uint {
-        const NEW_STACK_SIZE: uint = 4096*2;
+    fn new_stack() -> StackPointer {
+        const NEW_STACK_SIZE: usize = 4096*2;
         let stack_bottom = unsafe{allocate(NEW_STACK_SIZE, 4096)};
-        let stack_top = stack_bottom as uint + NEW_STACK_SIZE;
-        stack_top
+        let stack_top = stack_bottom as usize + NEW_STACK_SIZE;
+        StackPointer(stack_top)
     }
 
     #[inline(never)]
-    unsafe fn call_on_stack<Arg>(function: fn(Arg) -> !, arg: Arg, stack_top: uint) -> ! {
-        asm!("call $0;" :: "r"(function), "{rdi}"(arg), "{rsp}"(stack_top) :
+    unsafe fn call_on_stack<Arg>(function: fn(Arg) -> !, arg: Arg, sp: StackPointer) -> ! {
+        asm!("call $0;" :: "r"(function), "{rdi}"(arg), "{rsp}"(sp) :
             : "intel", "volatile");
         panic!("diverging fn returned");
     }
@@ -107,8 +110,8 @@ fn start_current_thread() -> ! {
     unsafe{enable_interrupts()};
 
     match current_state {
-        ThreadState::Active{rsp} => {
-            unsafe{pop_registers_and_iret(rsp)}
+        ThreadState::Active{stack_pointer} => {
+            unsafe{pop_registers_and_iret(stack_pointer)}
         },
         ThreadState::New{function} => {
             //println!("new");
