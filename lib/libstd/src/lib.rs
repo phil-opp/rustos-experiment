@@ -221,13 +221,13 @@ mod uint_macros;
 //#[path = "num/f32.rs"]   pub mod f32;
 //#[path = "num/f64.rs"]   pub mod f64;
 
-//pub mod ascii;
-//pub mod thunk;
+pub mod ascii;
+pub mod thunk;
 
 /* Common traits */
 
-//pub mod error;
-//pub mod num;
+pub mod error;
+pub mod num;
 
 /* Runtime and platform support */
 
@@ -280,7 +280,7 @@ mod std {
     pub use default;
 
     //pub use sync; // used for select!()
-    //pub use error; // used for try!()
+    pub use error; // used for try!()
     pub use fmt; // used for any formatting strings
     //pub use io; // used for println!()
     pub use option; // used for bitflags!{}
