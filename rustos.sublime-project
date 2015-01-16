@@ -6,9 +6,17 @@
 			"path": "src"
 		},
 		{
+			"folder_exclude_patterns":
+			[
+				"rust",
+				"**/target"
+			],
 			"follow_symlinks": true,
-			"path": "lib",
-			"folder_exclude_patterns": ["rust", "**/target"],
+			"path": "lib"
+		},
+		{
+			"follow_symlinks": true,
+			"path": "arch"
 		}
 	]
 }
