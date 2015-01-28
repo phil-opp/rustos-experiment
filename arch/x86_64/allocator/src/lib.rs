@@ -1,7 +1,10 @@
 #![no_std]
 #![allow(dead_code)]
 
+#[macro_use]
 extern crate core;
+#[macro_use] 
+extern crate bitflags;
 extern crate frame_stack;
 
 use core::prelude::*;
@@ -14,9 +17,6 @@ mod std {
 
 #[macro_use]
 mod macros;
-
-#[macro_use]
-mod bitflags;
 
 /* for testing */
 mod vga;
