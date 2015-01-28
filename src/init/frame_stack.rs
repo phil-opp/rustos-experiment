@@ -18,7 +18,7 @@ pub unsafe fn init_frame_stack(multiboot: *const ::multiboot::Information) {
     // map frame stack to 2mb behind kernel
     map_p1_entries(0, 0, stack_start_frame);
     // map p1 entries
-    for i in 0..512 {
+    for i in 0..512u32 {
         map_p1_entries(0, i, Frame{
             number: stack_start_frame.number + i,
         });
@@ -48,7 +48,7 @@ pub unsafe fn init_frame_stack(multiboot: *const ::multiboot::Information) {
                     last_mapped_p1_table += 1;
                     map_to_p1_table(last_mapped_p1_table, frame);
                     // map p1 entries
-                    for i in 0..512 {
+                    for i in 0..512u32 {
                         map_p1_entries(last_mapped_p1_table, i, Frame{
                             number: stack_start_frame.number + last_mapped_p1_table*512 + i,
                         });
