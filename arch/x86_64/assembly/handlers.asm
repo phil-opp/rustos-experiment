@@ -95,7 +95,15 @@ pop_registers_and_iret:
 %endmacro
 
 extern interrupt_handler
-extern pagefault_handler
+;extern pagefault_handler
+
+pagefault_handler:
+    mov edi, 0xB8000              ; Set the destination index to 0xB8000.
+    mov rax, 0x2F202F202F202F20   ; Set the A-register to 0x1F201F201F201F20.
+    mov ecx, 500                  ; Set the C-register to 500.
+    rep stosq                     ; Clear the screen.
+    hlt
+    ret
 
 %define H8
 HANDLER_WITH_ERRCODE 8, interrupt_handler

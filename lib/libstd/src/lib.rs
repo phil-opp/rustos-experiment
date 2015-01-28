@@ -281,7 +281,7 @@ mod std {
     pub use hash;
     pub use default;
 
-    //pub use sync; // used for select!()
+    pub use sync; // used for select!()
     pub use error; // used for try!()
     pub use fmt; // used for any formatting strings
     pub use io; // used for println!()

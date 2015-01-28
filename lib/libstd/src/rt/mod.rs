@@ -12,6 +12,7 @@ use io::stdio;
 #[lang = "panic_fmt"]
 pub extern fn rust_begin_unwind(msg: fmt::Arguments,
                                 file: &'static str, line: uint) -> ! {
+    loop{}
     begin_unwind_fmt(msg, &(file, line))
 }
 

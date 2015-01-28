@@ -11,7 +11,7 @@ mod init;
 
 #[no_mangle]
 pub fn main(multiboot: *const multiboot::Information) {
-
+    panic!("success!");
     unsafe{
         init::frame_stack(multiboot);
         scheduler::init();
@@ -34,6 +34,8 @@ pub fn main(multiboot: *const multiboot::Information) {
     // type inference lets us omit an explicit type signature (which
     // would be `HashMap<&str, &str>` in this example).
     let mut book_reviews = HashMap::new();
+
+    panic!("success!");
 
     // review some books.
     book_reviews.insert("Adventures of Huckleberry Finn",    "My favorite book.");
