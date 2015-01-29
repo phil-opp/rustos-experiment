@@ -270,6 +270,9 @@ mod bool;
 mod unit;
 mod tuple;
 
+//new
+pub mod async;
+
 // A curious inner-module that's not exported that contains the binding
 // 'std' so that macro-expanded references to std::error and such
 // can be resolved within libstd.
