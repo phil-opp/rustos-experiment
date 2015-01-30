@@ -2,7 +2,7 @@ pub use self::thunk::Thunk;
 
 use core::atomic::{AtomicBool, Ordering};
 use core::marker::Send;
-use core::ops::{FnOnce, Deref, DerefMut};
+use core::ops::{FnOnce, Deref, DerefMut, Drop};
 use core::option::Option::{self, Some, None};
 use core::result::Result::{self, Ok, Err};
 use collections::RingBuf;
@@ -11,10 +11,10 @@ mod thunk;
 
 struct TaskQueue {
     locked: AtomicBool,
-    tasks: RingBuf<Thunk<(),()>>,
+    tasks: RingBuf<Thunk>,
 }
 
-pub fn add<F>(f: F) -> Result<(), F> where F: FnOnce(), F: Send {
+pub fn add(f: Thunk) -> Result<(), Thunk> {
     match TaskQueue::core_local() {
         Some(mut queue) => {
             queue.push_back(f);
@@ -24,7 +24,7 @@ pub fn add<F>(f: F) -> Result<(), F> where F: FnOnce(), F: Send {
     }
 }
 
-pub fn next() -> Option<Thunk<(),()>> {
+pub fn next() -> Option<Thunk> {
     match TaskQueue::core_local() {
         Some(mut queue) => queue.pop_front(),
         None => None,
@@ -32,11 +32,13 @@ pub fn next() -> Option<Thunk<(),()>> {
 }
 
 impl TaskQueue {
-    pub fn push_back<F>(&mut self, f: F) where F: FnOnce(), F: Send {
-        self.tasks.push_back(Thunk::new(f))
+
+    pub fn push_back(&mut self, f: Thunk) {
+        self.tasks.push_back(f)
     }
 
-    pub fn pop_front(&mut self) -> Option<Thunk<(),()>> {
+
+    pub fn pop_front(&mut self) -> Option<Thunk> {
         self.tasks.pop_front()
     }
 
@@ -71,5 +73,12 @@ impl<'a> Deref for TaskQueueRef<'a> {
 impl<'a> DerefMut for TaskQueueRef<'a> {
     fn deref_mut(&mut self) -> &mut TaskQueue {
         self.0
+    }
+}
+
+#[unsafe_destructor]
+impl<'a> Drop for TaskQueueRef<'a> {
+    fn drop(&mut self) {
+        self.0.locked.store(false, Ordering::SeqCst)
     }
 }

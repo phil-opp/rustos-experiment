@@ -1,5 +1,5 @@
 #![no_std]
-#![feature(box_syntax, asm)]
+#![feature(box_syntax, asm, unsafe_destructor)]
 
 extern crate core;
 extern crate collections;
