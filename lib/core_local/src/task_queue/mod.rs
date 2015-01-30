@@ -9,7 +9,7 @@ use collections::RingBuf;
 
 mod thunk;
 
-pub struct TaskQueue {
+struct TaskQueue {
     locked: AtomicBool,
     tasks: RingBuf<Thunk<(),()>>,
 }

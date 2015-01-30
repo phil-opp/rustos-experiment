@@ -5,6 +5,4 @@ extern crate core;
 extern crate collections;
 extern crate alloc;
 
-pub use task_queue::{add, next, Thunk};
-
-mod task_queue;
+pub mod task_queue;
