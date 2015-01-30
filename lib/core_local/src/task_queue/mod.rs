@@ -4,6 +4,8 @@ use core::atomic::{AtomicBool, Ordering};
 use core::ops::{Deref, DerefMut, Drop};
 use core::option::Option::{self, Some, None};
 use core::result::Result::{self, Ok, Err};
+use core::mem;
+use alloc::boxed::Box;
 use collections::RingBuf;
 
 mod thunk;
@@ -28,6 +30,19 @@ pub fn next() -> Option<Thunk> {
         Some(mut queue) => queue.pop_front(),
         None => None,
     }
+}
+
+pub unsafe fn init() {
+    #[cfg(target_arch = "x86_64")]
+    unsafe fn set_task_queue_ptr(task_queue: Box<TaskQueue>) {
+        let task_queue_ptr: *const TaskQueue = mem::transmute(task_queue);
+        asm!("movq $0, %gs:0" :: "r"(task_queue_ptr) :: "volatile");
+    }
+
+    set_task_queue_ptr(Box::new(TaskQueue{
+        locked: AtomicBool::new(false),
+        tasks: RingBuf::new(),
+    }))
 }
 
 impl TaskQueue {

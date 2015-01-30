@@ -7,3 +7,7 @@ extern crate collections;
 extern crate alloc;
 
 pub mod task_queue;
+
+pub unsafe fn init() {
+    task_queue::init();
+}
