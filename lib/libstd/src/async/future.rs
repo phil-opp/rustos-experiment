@@ -5,7 +5,7 @@ use ops::FnOnce;
 use option::Option::{self, Some, None};
 use ptr::Unique;
 use sync::atomic::{AtomicBool, Ordering};
-use thunk::Thunk;
+use core_local::task_queue::{self, Thunk};
 
 pub struct Future<T: Send> {
     inner: Unique<FutureInner<T>>,
@@ -69,12 +69,12 @@ impl<T: Send> FutureSetter<T> {
     }
 }
 
-impl<T> FutureInner<T> {
+impl<T: Send> FutureInner<T> {
     fn invoke_if_set(&mut self) {
         if self.counterpart_finished.compare_and_swap(false, true, Ordering::SeqCst) {
             if let (Some(value), Some(then)) = (self.value.take(), self.then.take()) {
-                //TODO scheduler.add ...
-                then.invoke(value)
+                let task = Thunk::new(move |:| then.invoke(value));
+                assert!(task_queue::add(task).is_ok())
             } else {
                 unreachable!();
             }
