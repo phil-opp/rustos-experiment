@@ -15,14 +15,22 @@ pub struct FutureSetter<T: Send> {
     inner: Unique<FutureInner<T>>,
 }
 
-pub struct FutureInner<T: Send> {
+struct FutureInner<T: Send> {
     counterpart_finished: AtomicBool,
     value: Option<T>,
     then: Option<Thunk<T, ()>>,
 }
 
 impl<T: Send> Future<T> {
-    pub fn new() -> (Future<T>, FutureSetter<T>) {
+
+    pub fn from_fn<F>(f: F) -> Future<T> where F: FnOnce()->T, F: Send {
+        let (future, setter) = Future::new();
+        let task = Thunk::new(move |:| setter.set(f()));
+        assert!(task_queue::add(task).is_ok());
+        future
+    }
+
+    fn new() -> (Future<T>, FutureSetter<T>) {
         let inner = FutureInner::<T> {
             value: None,
             then: None, 
@@ -31,6 +39,7 @@ impl<T: Send> Future<T> {
         let inner_ptr = unsafe{mem::transmute(Box::new(inner))};
         (Future{inner: Unique(inner_ptr)}, FutureSetter{inner: Unique(inner_ptr)}) 
     }
+
     pub fn then<F, V>(self, f: F) -> Future<V> where V:Send, F: FnOnce(T)->V + Send {
         let (future, future_setter) = Future::new();
         let then = move |: value| future_setter.set(f(value));
