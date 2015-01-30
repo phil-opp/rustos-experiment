@@ -2,8 +2,12 @@
 
 extern crate spinlock;
 extern crate scheduler;
+extern crate core_local;
+extern crate os;
 
 use scheduler::StackPointer;
+use core_local::task_queue;
+use os::async;
 
 mod multiboot;
 mod init;
@@ -14,21 +18,25 @@ pub fn main(multiboot: *const multiboot::Information) {
     unsafe{
         init::frame_stack(multiboot);
         scheduler::init();
+        core_local::init();
         enable_interrupts();
     };
 
-    print!("test\n\niuaeiae");
-    let x = Box::new(5);
+    /*
+    {
+        print!("test\n\niuaeiae");
+        let x = Box::new(5);
 
-    let y = 0xb8000 as *mut u64;
-    unsafe{*y = 0xffffffffffffffff};
+        let y = 0xb8000 as *mut u64;
+        unsafe{*y = 0xffffffffffffffff};
 
-    print!("test");
-    print!("test\n");
-    println!("newline {}", x);
-
+        print!("test");
+        print!("test\n");
+        println!("newline {}", x);
+    }
 
     scheduler::spawn(|| print!("I'm #1!\n"));
+
 
     fn test(name: &str) {
         for _ in 0..20 {
@@ -46,10 +54,54 @@ pub fn main(multiboot: *const multiboot::Information) {
     scheduler::spawn(|| test("4"));
     scheduler::spawn(|| test("5"));
     scheduler::spawn(|| test("6"));
+    */
+
+    let a = async::run(|| {
+        for _ in 0..100000 {}
+        42
+    });
+
+    let b = a.then(|a| a/2);
+    let c = b.then(|b| b-10);
+    let d = c.then(|c| println!("c: {}", c));
+
+    /*async::run(|| {
+        for i in 0u32..50 {
+            //print!("{}:", i);
+            async::run(move || i+1).then(|ii| {
+                print!("{}.", ii);
+            });
+        }
+    });*/
+
+    println!("");
+
+    async::run(|| {
+        let mut x = async::run(|| 1);
+        for i in 0u64..3000 {
+            x = x.then(move |x| {
+                //print!("{}.", x); 
+                (x+i)
+            });
+        }
+        x.then(|x| println!("\n\n\n\n{} == {}", x, 2999*3000/2+1));
+    });
+
+
+    fn worker() {
+        loop {
+            if let Some(f) = core_local::task_queue::next() {
+                f.invoke(())
+            }
+        }
+    }
+
+    worker();
     
+    /*
     loop{
         test("m");
-    }
+    }*/
     panic!("end of os!");
 }
 
@@ -107,7 +159,7 @@ pub extern "C" fn interrupt_handler(interrupt_number: u64, error_code: u64, sp: 
     //TODO move interrupt numbers to own crate (yield() etc)
 
     match interrupt_number {
-        32 => unsafe{scheduler::reschedule(sp)},
+        32 => {},//unsafe{scheduler::reschedule(sp)},
         66 => unsafe{scheduler::schedule()},
         _ => {},
     }    

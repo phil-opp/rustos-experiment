@@ -20,3 +20,9 @@ path = "arch/x86_64/frame_stack"
 [dependencies.spinlock]
 git = "https://github.com/phil-opp/spinlock-rs.git"
 branch = "try_lock"
+
+[dependencies.core_local]
+path = "lib/core_local"
+
+[dependencies.os]
+path = "lib/os"
