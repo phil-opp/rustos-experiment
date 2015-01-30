@@ -1,17 +1,19 @@
 #![feature(asm, unboxed_closures, unsafe_destructor)]
+#![feature(core)]
+#![feature(std_misc)]
+#![feature(alloc)]
 
 use std::collections::RingBuf;
 use std::default::Default;
 use std::mem;
+use std::thunk::Thunk;
 use std::rt::heap::allocate;
 use global::global;
 use spinlock::Spinlock;
 use thread::{Thread, ThreadState};
-use fn_box::FnBox;
 use std::fmt;
 
 mod thread;
-mod fn_box;
 mod global;
 mod thread_local;
 mod spinlock;
@@ -100,9 +102,9 @@ fn start_current_thread() -> ! {
         panic!("diverging fn returned");
     }
 
-    fn invoke(function: Box<FnBox() + Send>) -> ! {
+    fn invoke(function: Thunk) -> ! {
         // TODO unsafe{::enable_interrupts()};
-        function.call_once(());
+        function.invoke(());
         unsafe{asm!("int $$66" :::: "volatile")};
         unreachable!();
     }

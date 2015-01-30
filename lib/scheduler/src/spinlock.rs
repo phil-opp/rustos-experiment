@@ -89,7 +89,6 @@ pub struct SpinlockGuard<'a, T:'a>
     data: &'a mut T,
 }
 
-#[allow(unstable)]
 unsafe impl<T> Sync for Spinlock<T> {}
 
 /// A Spinlock which may be used statically.

@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT, Ordering};
 use std::default::Default;
-use fn_box::FnBox;
+use std::thunk::Thunk;
 use StackPointer;
 
 pub struct Thread {
@@ -8,7 +8,7 @@ pub struct Thread {
     pub state: ThreadState,
 }
 
-#[derive(Show)]
+#[derive(Debug)]
 pub struct ThreadId(usize);
 
 impl ThreadId {
@@ -19,7 +19,7 @@ impl ThreadId {
 
 pub enum ThreadState {
     New {
-        function: Box<FnBox() + Send>,
+        function: Thunk,
     },
     Active {
         stack_pointer: StackPointer,
@@ -38,7 +38,7 @@ impl Thread {
         Thread {
             id: Thread::next_id(),
             state: ThreadState::New {
-                function: Box::new(f),
+                function: Thunk::new(f),
             }
         }
     }
