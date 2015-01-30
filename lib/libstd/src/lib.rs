@@ -79,7 +79,8 @@
 //! memory types, including [`atomic`](sync/atomic/index.html).
 //!
 //! Common types of I/O, including files, TCP, UDP, pipes, Unix domain sockets,
-//! timers, and process spawning, are defined in the [`io`](io/index.html) module.
+//! timers, and process spawning, are defined in the
+//! [`old_io`](old_io/index.html) module.
 //!
 //! Rust's I/O and concurrency depends on a small runtime interface
 //! that lives, along with its support code, in mod [`rt`](rt/index.html).
@@ -95,7 +96,8 @@
 //! and `format!`, also available to all Rust code.
 
 #![crate_name = "std"]
-#![stable]
+#![stable(feature = "rust1", since = "1.0.0")]
+#![feature(staged_api)]
 #![staged_api]
 #![crate_type = "rlib"]
 #![crate_type = "dylib"]
@@ -113,7 +115,14 @@
 #![feature(optin_builtin_traits)]
 #![feature(int_uint)]
 #![feature(int_uint)]
-#![allow(unstable)]
+#![feature(core)]
+#![feature(libc)]
+#![feature(alloc)]
+#![feature(unicode)]
+#![feature(collections)]
+#![feature(rand)]
+#![feature(hash)]
+#![cfg_attr(test, feature(test))]
 
 // Don't link to std. We are std.
 #![no_std]
@@ -176,7 +185,7 @@ pub use alloc::rc;
 pub use core_collections::slice;
 pub use core_collections::str;
 pub use core_collections::string;
-#[stable]
+#[stable(feature = "rust1", since = "1.0.0")]
 pub use core_collections::vec;
 
 pub use unicode::char;
@@ -239,7 +248,7 @@ pub mod num;
 //pub mod dynamic_lib;
 //pub mod ffi;
 pub mod fmt;
-pub mod io;
+pub mod old_io;
 //pub mod os;
 //pub mod path;
 //pub mod rand;
@@ -288,7 +297,7 @@ mod std {
     //pub use sync; // used for select!()
     pub use error; // used for try!()
     pub use fmt; // used for any formatting strings
-    //pub use io; // used for println!()
+    //pub use old_io; // used for println!()
     pub use option; // used for bitflags!{}
     //pub use rt; // used for panic!()
     pub use vec; // used for vec![]

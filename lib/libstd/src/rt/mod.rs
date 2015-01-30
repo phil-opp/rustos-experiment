@@ -5,7 +5,7 @@ pub use alloc::heap;
 
 use any::Any;
 use fmt;
-use io::stdio;
+use old_io::stdio;
 
 #[cfg(not(test))]
 /// Entry point of panic from the libcore crate.
