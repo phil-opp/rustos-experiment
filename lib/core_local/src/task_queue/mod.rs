@@ -1,8 +1,7 @@
 pub use self::thunk::Thunk;
 
 use core::atomic::{AtomicBool, Ordering};
-use core::marker::Send;
-use core::ops::{FnOnce, Deref, DerefMut, Drop};
+use core::ops::{Deref, DerefMut, Drop};
 use core::option::Option::{self, Some, None};
 use core::result::Result::{self, Ok, Err};
 use collections::RingBuf;
