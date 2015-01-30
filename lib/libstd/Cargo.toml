@@ -14,6 +14,3 @@ features = ["external_crate"]
 
 [dependencies.collections]
 path = "../libcollections"
-
-[dependencies.core_local]
-path = "../core_local"

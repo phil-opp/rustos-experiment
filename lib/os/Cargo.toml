@@ -1,0 +1,11 @@
+[package]
+
+name = "os"
+version = "0.0.1"
+authors = ["Philipp Oppermann <dev@phil-opp.com>"]
+
+[dependencies.std]
+path = "../libstd"
+
+[dependencies.core_local]
+path = "../core_local"

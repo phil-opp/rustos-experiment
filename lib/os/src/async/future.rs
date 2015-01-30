@@ -1,10 +1,6 @@
-use boxed::Box;
-use marker::Send;
-use mem;
-use ops::FnOnce;
-use option::Option::{self, Some, None};
-use ptr::Unique;
-use sync::atomic::{AtomicBool, Ordering};
+use std::mem;
+use std::ptr::Unique;
+use std::sync::atomic::{AtomicBool, Ordering};
 use core_local::task_queue::{self, Thunk};
 
 pub struct Future<T: Send> {
