@@ -1,0 +1,13 @@
+[package]
+
+name = "core_local"
+version = "0.0.1"
+authors = ["Philipp Oppermann <dev@phil-opp.com>"]
+
+[dependencies.alloc]
+path = "../liballoc"
+default-features = false
+features = ["external_crate"]
+
+[dependencies.collections]
+path = "../libcollections"
