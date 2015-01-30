@@ -271,6 +271,7 @@ mod unit;
 mod tuple;
 
 //new
+extern crate core_local;
 pub mod async;
 
 // A curious inner-module that's not exported that contains the binding
