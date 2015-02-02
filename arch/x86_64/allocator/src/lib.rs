@@ -78,8 +78,12 @@ pub unsafe fn deallocate(_ptr: *mut u8, _old_size: usize, _align: usize) {
     //print!("start: {:x}, size: {:x}, align: {:x}\n", _ptr as usize, _old_size, _align);
 }
 
-pub unsafe fn reallocate(_ptr: *mut u8, _old_size: usize, size: usize, align: usize) -> *mut u8 {
-    allocate(size, align)
+pub unsafe fn reallocate(old_ptr: *mut u8, old_size: usize, size: usize, align: usize) -> *mut u8 {
+    let new_ptr = allocate(size, align);
+    for i in 0..(old_size as isize) {
+        *new_ptr.offset(i) = *old_ptr.offset(i);
+    }
+    new_ptr
 }
 
 pub unsafe fn reallocate_inplace(_ptr: *mut u8, _old_size: usize, _size: usize, 
