@@ -65,14 +65,14 @@ pub fn main(multiboot: *const multiboot::Information) {
     let c = b.then(|b| b-10);
     let d = c.then(|c| println!("c: {}", c));
 
-    /*async::run(|| {
+    async::run(|| {
         for i in 0u32..50 {
             //print!("{}:", i);
             async::run(move || i+1).then(|ii| {
                 print!("{}.", ii);
             });
         }
-    });*/
+    });
 
     println!("");
 
@@ -88,20 +88,17 @@ pub fn main(multiboot: *const multiboot::Information) {
     });
 
 
-    fn worker() {
-        loop {
-            if let Some(f) = core_local::task_queue::next() {
-                f.invoke(())
-            }
+    fn work() {
+        if let Some(f) = core_local::task_queue::next() {
+            f.invoke(())
         }
     }
-
-    worker();
+   
     
-    /*
     loop{
-        test("m");
-    }*/
+        work();
+        //test("m");
+    }
     panic!("end of os!");
 }
 
