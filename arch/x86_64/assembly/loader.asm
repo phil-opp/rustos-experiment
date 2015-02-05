@@ -222,6 +222,15 @@ map_frame_buffer_tables:
 
     mov rdi, rbx ;multiboot structure
 
+
+    ; testtestetset
+        mov rsp, 16 ; don't use 0 here as that wouldn't trigger a page fault 
+                    ; but instead override some (recursively mapped) page tables 
+        push rax
+    ; testestestse end
+
+
+
     extern main 
     call main
 
@@ -271,7 +280,7 @@ Tss:
     DD 0            ; reserved
     times 3 DQ 0    ; rsp {0,1,2}
     DQ 0            ; reserved
-    DQ 0            ; IST1
+    DQ DoubleFaultStack ; IST1
     times 6 DQ 0    ; IST{2-7}
     DQ 0            ; reserved
     DW 0            ; reserved
@@ -287,10 +296,19 @@ times 0x100 db 0
 
 ;stack
 StackBottom:
-times 0x8000 db 0
 align 4096        ;use align bytes as stack
+times 0x8000 db 0
 Stack:
 
+;double fault stack
+times 0x8000 db 0
+DoubleFaultStack:
+
+
+; - - - - - - - - -
+; page tables
+; - - - - - - - - -
+align 4096
 P4:
 times 0x1000 db 0
 P3:

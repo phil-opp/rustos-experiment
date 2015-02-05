@@ -99,6 +99,7 @@ extern pagefault_handler
 
 %define H8
 HANDLER_WITH_ERRCODE 8, interrupt_handler
+%define H8_IST 1 ;double fault stack
 %define H10
 HANDLER_WITH_ERRCODE 10, interrupt_handler
 %define H11
@@ -159,7 +160,13 @@ _handler_33: ;keyboard
     ;TODO: remove the word data exceeds bounds warning
     DW (_handler_%1-0x200000)  ;offset_low
     DW 0x8              ;text segment
-    DB 0                ;zero1
+
+    %ifdef H%1_IST
+        DB H%1_IST      ;interrupt stack table index
+    %elif
+        DB 0            ;no stack switch (if cpl doesn't change)
+    %endif
+
     DB 0x8e             ;type_addr: present+interrupt_gate
     DW 0x20             ;offset_middle
     DQ 0                ;offset_high and zero2
