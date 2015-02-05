@@ -222,15 +222,6 @@ map_frame_buffer_tables:
 
     mov rdi, rbx ;multiboot structure
 
-
-    ; testtestetset
-        mov rsp, 16 ; don't use 0 here as that wouldn't trigger a page fault 
-                    ; but instead override some (recursively mapped) page tables 
-        push rax
-    ; testestestse end
-
-
-
     extern main 
     call main
 
