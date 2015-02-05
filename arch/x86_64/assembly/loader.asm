@@ -146,6 +146,9 @@ enable_paging:
     mov ds, ax
     mov es, ax
 
+    mov eax, 0x28   ;tss segment
+    ltr ax
+
     ;set fs
     mov edx, 0
     mov eax, fsStruct
@@ -236,8 +239,6 @@ clear_screen_green:
     rep stosq                     ; Clear the screen.
     ret
 
-[BITS 32]
-
 Gdt32:
     DQ  0x0000000000000000
     DQ  0x00CF9A000000FFFF
@@ -248,15 +249,34 @@ Gdt64:
     DQ  0x00A0920000000000  ;ring 0 data
     DQ  0x00A0FA0000000000  ;ring 3 code
     DQ  0x00A0F20000000000  ;ring 3 data
+    ; tss (16 byte big in 64bit mode)
+    DW 0x0067 ; limit
+    DW (Tss-0x200000)
+    DB 0x20 ;base middle
+    DB 0x89 ;present + (type = `non busy tss`)
+    DW 0x0  ;upper byte: base high; lower byte: flags + limit middle
+    DQ 0x0  ;base high
+    DQ 0x0  ;reserved
  
 Gdt32Pointer:
     DW  23
     DD  Gdt32
  
 Gdt64Pointer:
-    DW  39
+    DW  55
     DD  Gdt64
     DD  0
+
+Tss:
+    DD 0            ; reserved
+    times 3 DQ 0    ; rsp {0,1,2}
+    DQ 0            ; reserved
+    DQ 0            ; IST1
+    times 6 DQ 0    ; IST{2-7}
+    DQ 0            ; reserved
+    DW 0            ; reserved
+    DW 0            ; io map base address
+
 
 [section .data]
 
@@ -304,8 +324,6 @@ times 0x1000 db 0
 ; - - - - - - - - - - - - - - - - - - - -
 
 [section .text]
-
-[BITS 64]
 
 global fmod
 fmod: jmp $
