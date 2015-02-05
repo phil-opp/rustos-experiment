@@ -41,9 +41,9 @@ pub fn begin_unwind_fmt(msg: fmt::Arguments, file_line: &(&'static str, uint)) -
 
 /// This is the entry point of unwinding for panic!() and assert!().
 #[inline(never)] #[cold] // avoid code bloat at the call sites as much as possible
-pub fn begin_unwind<M: Any + Send>(msg: M, file_line: &(&'static str, uint)) -> ! {
-    //stdio::print_err_args(msg, file_line);
-    begin_unwind_fmt(format_args!("{}", "panic"), file_line);
+pub fn begin_unwind<M: Any + Send + fmt::Display>(msg: M, file_line: &(&'static str, uint)) -> ! {
+    stdio::print_err_args(format_args!("{}", msg), file_line);
+    loop{}
     // Note that this should be the only allocation performed in this code path.
     // Currently this means that panic!() on OOM will invoke this code path,
     // but then again we're not really ready for panic on OOM anyway. If
