@@ -4,12 +4,14 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use core_local::task_queue::{self, Thunk};
 
 pub struct Future<T: Send> {
-    inner: Unique<FutureInner<T>>,
+    inner: FutureInnerPointer<T>,
 }
 
 pub struct FutureSetter<T: Send> {
-    inner: Unique<FutureInner<T>>,
+    inner: FutureInnerPointer<T>,
 }
+
+struct FutureInnerPointer<T: Send>(Unique<FutureInner<T>>);
 
 struct FutureInner<T: Send> {
     counterpart_finished: AtomicBool,
@@ -19,6 +21,10 @@ struct FutureInner<T: Send> {
 
 impl<T: Send> Future<T> {
 
+    fn new() -> (Future<T>, FutureSetter<T>) {
+        FutureInner::new()
+    }
+
     pub fn from_fn<F>(f: F) -> Future<T> where F: FnOnce()->T, F: Send {
         let (future, setter) = Future::new();
         let task = Thunk::new(move |:| setter.set(f()));
@@ -26,28 +32,16 @@ impl<T: Send> Future<T> {
         future
     }
 
-    fn new() -> (Future<T>, FutureSetter<T>) {
-        let inner = FutureInner::<T> {
-            value: None,
-            then: None, 
-            counterpart_finished: AtomicBool::new(false),
-        };
-        let inner_ptr = unsafe{mem::transmute(Box::new(inner))};
-        (Future{inner: Unique(inner_ptr)}, FutureSetter{inner: Unique(inner_ptr)}) 
-    }
-
     pub fn then<F, V>(self, f: F) -> Future<V> where V:Send, F: FnOnce(T)->V + Send {
         let (future, future_setter) = Future::new();
         let then = move |: value| future_setter.set(f(value));
 
-        let inner = unsafe{self.get_inner()};
-        inner.then = Some(Thunk::with_arg(then));
-        inner.invoke_if_set();
+        unsafe{self.inner.set_then(Thunk::with_arg(then))};
         future
     }
 
     pub fn get(self) -> T {
-        let inner = unsafe{self.get_inner()};
+        let inner = unsafe{&mut *(self.inner.0).0};
         while !inner.counterpart_finished.load(Ordering::Relaxed) {
             // busy wait...
         }
@@ -56,33 +50,55 @@ impl<T: Send> Future<T> {
             Some(v) => v,
         }
     }
-
-    unsafe fn get_inner(&self) -> &mut FutureInner<T> {
-        &mut *self.inner.0
-    }
 }
 
 impl<T: Send> FutureSetter<T> {
     pub fn set(self, value: T) {
-        let inner = unsafe{self.get_inner()};
-        inner.value = Some(value);
-        inner.invoke_if_set();
+        unsafe{self.inner.set_value(value)};
+    }
+}
+
+impl<T: Send> FutureInnerPointer<T> {
+    unsafe fn set_then(self, then: Thunk<T,()>) {
+        (*self.inner_ptr()).then = Some(then);
+    }    
+
+    unsafe fn set_value(self, value: T) {
+        (*self.inner_ptr()).value = Some(value);
     }
 
-    unsafe fn get_inner(&self) -> &mut FutureInner<T> {
-        &mut *self.inner.0
+    unsafe fn inner_ptr(&self) -> &mut FutureInner<T> {
+        &mut *(self.0).0
+    }    
+}
+
+#[unsafe_destructor]
+impl<T: Send> Drop for FutureInnerPointer<T> {
+    fn drop(&mut self) {
+        unsafe{self.inner_ptr().invoke_if_set()}
     }
 }
 
 impl<T: Send> FutureInner<T> {
+    fn new() -> (Future<T>, FutureSetter<T>) {
+        let inner = FutureInner::<T> {
+            value: None,
+            then: None, 
+            counterpart_finished: AtomicBool::new(false),
+        };
+        let inner_ptr = unsafe{mem::transmute(Box::new(inner))};
+        (Future{inner: FutureInnerPointer(Unique(inner_ptr))}, 
+            FutureSetter{inner: FutureInnerPointer(Unique(inner_ptr))})
+    }
+
     fn invoke_if_set(&mut self) {
-        if self.counterpart_finished.compare_and_swap(false, true, Ordering::SeqCst) {
+        if self.counterpart_finished.compare_and_swap(false, true, Ordering::SeqCst) == true {
             if let (Some(value), Some(then)) = (self.value.take(), self.then.take()) {
                 let task = Thunk::new(move |:| then.invoke(value));
                 assert!(task_queue::add(task).is_ok())
-            } else {
-                unreachable!();
             }
+            let inner: Box<FutureInner<T>> = unsafe{mem::transmute(self as *mut _)};
+            drop(inner);
         }
     }
 }
