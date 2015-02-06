@@ -60,14 +60,14 @@ impl<T: Send> FutureSetter<T> {
 
 impl<T: Send> FutureInnerPointer<T> {
     unsafe fn set_then(self, then: Thunk<T,()>) {
-        (*self.inner_ptr()).then = Some(then);
+        self.as_ref().then = Some(then);
     }    
 
     unsafe fn set_value(self, value: T) {
-        (*self.inner_ptr()).value = Some(value);
+        self.as_ref().value = Some(value);
     }
 
-    unsafe fn inner_ptr(&self) -> &mut FutureInner<T> {
+    unsafe fn as_ref(&self) -> &mut FutureInner<T> {
         &mut *(self.0).0
     }    
 }
@@ -75,7 +75,7 @@ impl<T: Send> FutureInnerPointer<T> {
 #[unsafe_destructor]
 impl<T: Send> Drop for FutureInnerPointer<T> {
     fn drop(&mut self) {
-        unsafe{self.inner_ptr().invoke_if_set()}
+        unsafe{self.as_ref().invoke_if_set()}
     }
 }
 
