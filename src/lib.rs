@@ -74,7 +74,7 @@ pub fn main(multiboot: *const multiboot::Information) {
         }
     });
 
-    println!("");
+    println!("abc");
 
     async::run(|| {
         let mut x = async::run(|| 1);
@@ -93,6 +93,27 @@ pub fn main(multiboot: *const multiboot::Information) {
             f.invoke(())
         }
     }
+
+    let (stream, mut sender) = async::Stream::new();
+
+    let mut iuae = 0;
+    let stream = stream.map(move |v: i32| {iuae += v*v; iuae}).map(|v: i32| match v {
+        v if v<0 => format!("negative: {}", v),
+        v if v==0 => format!("null: {}", v),
+        v => format!("positive: {}", v),
+    });
+    let mut count = 0;
+    stream.map(move |v| {
+        let ret = (count, v);
+        count += 1;
+        ret
+    }).foreach(|v| print!("\n-->{:?}<-- ", v));
+
+    sender.send(0);
+    sender.send(1);
+    sender.send(2);
+    sender.send(3);
+    sender.send(4);
    
     
     loop{
