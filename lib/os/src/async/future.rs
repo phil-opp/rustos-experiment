@@ -21,7 +21,7 @@ struct FutureInner<T: Send> {
 
 impl<T: Send> Future<T> {
 
-    fn new() -> (Future<T>, FutureSetter<T>) {
+    pub fn new() -> (Future<T>, FutureSetter<T>) {
         FutureInner::new()
     }
 
