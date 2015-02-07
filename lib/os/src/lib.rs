@@ -11,5 +11,5 @@ mod alloc {
     pub use std::boxed;
 }
 mod sync {
-    pub use std::sync::*;
+    pub use std::sync::atomic;
 }

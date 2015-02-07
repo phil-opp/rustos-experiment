@@ -1,8 +1,10 @@
 pub use self::future::Future;
+pub use self::stream::Stream;
 
 pub use core_local::task_queue;
 
 mod future;
+mod stream;
 mod spsc_queue;
 mod mpsc_queue;
 
