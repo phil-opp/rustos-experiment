@@ -3,147 +3,119 @@ use std::ptr::Unique;
 use std::sync::atomic::{AtomicBool, Ordering};
 use core_local::task_queue::{self, Thunk};
 
-pub struct Future<T: Send> {
-    inner: FutureInnerPointer<T>,
+pub trait Future: Send {
+    type Item: Send;
+
+    fn then<F>(self, f: F) where F: FnOnce(Self::Item) + Send;
 }
 
-pub struct FutureSetter<T: Send> {
-    inner: FutureInnerPointer<T>,
+pub trait FutureExt: Future + Sized {
+    fn map<F, B>(self, f: F) -> Map<Self, F> where 
+        F: FnOnce(Self::Item) -> B + Send,
+    {
+        Map{future: self, f: f}
+    }
 }
 
-struct FutureInnerPointer<T: Send>(Unique<FutureInner<T>>);
+impl<Fut> FutureExt for Fut where Fut: Future {}
 
-struct FutureInner<T: Send> {
+#[must_use = "future adaptors are lazy and do nothing unless consumed"]
+pub struct Map<Fut, F> {
+    future: Fut,
+    f: F,
+}
+
+impl<Fut: Future, F, B: Send> Future for Map<Fut, F> where F: FnOnce(Fut::Item) -> B + Send {
+    type Item = B;
+
+    fn then<G>(self, g: G) where G: FnOnce(<Self as Future>::Item) + Send {
+        let Map{future, f} = self;
+        future.then(move |b| g(f(b)))
+    }
+}
+
+
+pub struct Computation<T: Send> {
+    inner: ComputationInnerPointer<T>,
+}
+
+struct ComputationResultSetter<T: Send> {
+    inner: ComputationInnerPointer<T>,    
+}
+
+struct ComputationInnerPointer<T: Send>(Unique<ComputationInner<T>>);
+
+struct ComputationInner<T: Send> {
     counterpart_finished: AtomicBool,
     value: Option<T>,
-    then: Option<Thunk<T, ()>>,
+    then: Option<Thunk<T,()>>,    
 }
 
-impl<T: Send> Future<T> {
-
-    pub fn new() -> (Future<T>, FutureSetter<T>) {
-        FutureInner::new()
-    }
-
-    pub fn from_fn<F>(f: F) -> Future<T> where F: FnOnce()->T, F: Send {
-        let (future, setter) = Future::new();
+impl<T: Send> Computation<T> {
+    pub fn new<F>(f: F) -> Computation<T> where F: FnOnce() -> T + Send {
+        let (future, setter) = ComputationInner::new();
         let task = Thunk::new(move |:| setter.set(f()));
         assert!(task_queue::add(task).is_ok());
         future
     }
+}
 
-    pub fn then<F, V>(self, f: F) -> Future<V> where V:Send, F: FnOnce(T)->V + Send {
-        let (future, future_setter) = Future::new();
-        let then = move |: value| future_setter.set(f(value));
+impl<T: Send> Future for Computation<T> {
+    type Item = T;
 
-        unsafe{self.inner.set_then(Thunk::with_arg(then))};
-        future
-    }
-
-    pub fn get(self) -> T {
-        let inner = unsafe{&mut *(self.inner.0).0};
-        while !inner.counterpart_finished.load(Ordering::Relaxed) {
-            // busy wait...
-        }
-        match inner.value.take() {
-            None => unreachable!(),
-            Some(v) => v,
-        }
+    fn then<F>(self, f: F) where F: FnOnce(<Self as Future>::Item) + Send {
+        unsafe{self.inner.set_then(Thunk::with_arg(f))}
     }
 }
 
-impl<T: Send> FutureSetter<T> {
-    pub fn set(self, value: T) {
-        unsafe{self.inner.set_value(value)};
+impl<T: Send> ComputationResultSetter<T> {
+    fn set(self, value: T) {
+        unsafe{self.inner.set_value(value)}
     }
 }
 
-impl<T: Send> FutureInnerPointer<T> {
+impl<T: Send> ComputationInnerPointer<T> {
     unsafe fn set_then(self, then: Thunk<T,()>) {
-        self.as_ref().then = Some(then);
+        self.as_ref().then = Some(then); // + implicitely invoke destructor
     }    
 
     unsafe fn set_value(self, value: T) {
-        self.as_ref().value = Some(value);
+        self.as_ref().value = Some(value); // + implicitely invoke destructor
     }
 
-    unsafe fn as_ref(&self) -> &mut FutureInner<T> {
+    unsafe fn as_ref(&self) -> &mut ComputationInner<T> {
         &mut *(self.0).0
-    }    
+    }
 }
 
 #[unsafe_destructor]
-impl<T: Send> Drop for FutureInnerPointer<T> {
+impl<T: Send> Drop for ComputationInnerPointer<T> {
     fn drop(&mut self) {
         unsafe{self.as_ref().invoke_if_set()}
     }
 }
 
-impl<T: Send> FutureInner<T> {
-    fn new() -> (Future<T>, FutureSetter<T>) {
-        let inner = FutureInner::<T> {
+impl<T: Send> ComputationInner<T> {
+    fn new() -> (Computation<T>, ComputationResultSetter<T>) {
+        let inner = ComputationInner::<T> {
             value: None,
             then: None, 
             counterpart_finished: AtomicBool::new(false),
         };
         let inner_ptr = unsafe{mem::transmute(Box::new(inner))};
-        (Future{inner: FutureInnerPointer(Unique(inner_ptr))}, 
-            FutureSetter{inner: FutureInnerPointer(Unique(inner_ptr))})
+        let computation = Computation{inner: ComputationInnerPointer(Unique(inner_ptr))};
+        let setter = ComputationResultSetter{inner: ComputationInnerPointer(Unique(inner_ptr))};
+        (computation, setter)
     }
 
-    fn invoke_if_set(&mut self) {
+    unsafe fn invoke_if_set(&mut self) {
         if self.counterpart_finished.compare_and_swap(false, true, Ordering::SeqCst) == true {
             if let (Some(value), Some(then)) = (self.value.take(), self.then.take()) {
                 let task = Thunk::new(move |:| then.invoke(value));
                 assert!(task_queue::add(task).is_ok())
             }
-            let inner: Box<FutureInner<T>> = unsafe{mem::transmute(self as *mut _)};
+            let inner: Box<ComputationInner<T>> = unsafe{mem::transmute(self as *mut _)};
             drop(inner);
         }
     }
-}
-
-#[test]
-fn test_set_first() {
-    let (future, setter) = Future::new();
-
-    setter.set(42);
-    let f = move |: x: i32| {
-        assert_eq!(x, 42);
-        4
-    };
-
-    let result = future.then(f);
-    assert_eq!(result.get(), 4);
-}
-
-#[test]
-fn test_then_first() {
-    let (future, setter) = Future::new();
-
-    let f = move |: x: i32| {
-        assert_eq!(x, 42);
-        4
-    };
-    let result = future.then(f);
-
-    setter.set(42);
-
-    assert_eq!(result.get(), 4);
-}
-
-#[test]
-fn test_chain() {
-    fn test(x: i32) -> i32 {
-        x/2 + 2
-    }
-    let (result1, setter) = Future::new();
-
-    let result2 = result1.then(test); // 10
-    let result3 = result2.then(test); // 7
-    let result4 = result3.then(test); // 5
-
-    setter.set(16);
-
-    assert_eq!(result4.get(), 5);
 }
