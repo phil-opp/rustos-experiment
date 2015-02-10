@@ -23,7 +23,7 @@ struct ComputationInner<T: Send> {
 impl<T: Send> Computation<T> {
     pub fn new<F>(f: F) -> Computation<T> where F: FnOnce() -> T + Send {
         let (future, setter) = ComputationInner::new();
-        let task = Thunk::new(move |:| setter.set(f()));
+        let task = Thunk::new(move || setter.set(f()));
         assert!(task_queue::add(task).is_ok());
         future
     }
@@ -80,7 +80,7 @@ impl<T: Send> ComputationInner<T> {
     unsafe fn invoke_if_set(&mut self) {
         if self.counterpart_finished.compare_and_swap(false, true, Ordering::SeqCst) == true {
             if let (Some(value), Some(then)) = (self.value.take(), self.then.take()) {
-                let task = Thunk::new(move |:| then.invoke(value));
+                let task = Thunk::new(move || then.invoke(value));
                 assert!(task_queue::add(task).is_ok())
             }
             let inner: Box<ComputationInner<T>> = unsafe{mem::transmute(self as *mut _)};

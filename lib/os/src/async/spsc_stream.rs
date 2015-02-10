@@ -52,7 +52,7 @@ impl<T: Send> StreamInnerPointer<T> {
             // receiver was dropped -> invoke remaining tasks
             let mut inner: Box<StreamInner<T>> = mem::transmute(self);
             if let Some(mut f) = inner.foreach.take() {
-                let task = Thunk::new(move |:| {
+                let task = Thunk::new(move || {
                     while let Some(value) = inner.queue.pop() {
                         f.invoke(value)
                     }
@@ -111,7 +111,7 @@ impl<R> MutThunk<(),R> {
     fn new<F>(mut func: F) -> MutThunk<(),R>
         where F : FnMut() -> R, F : Send
     {
-        MutThunk::with_arg(move|&mut: ()| func())
+        MutThunk::with_arg(move |()| func())
     }
 }
 

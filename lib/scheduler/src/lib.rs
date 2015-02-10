@@ -148,7 +148,7 @@ impl GlobalScheduler {
         
         //let (tx, rx) = channel();
 
-        self.threads.lock().push_back(Thread::new(move |:| {
+        self.threads.lock().push_back(Thread::new(move || {
             /*tx.send_opt(*/ f();
         }));
 
