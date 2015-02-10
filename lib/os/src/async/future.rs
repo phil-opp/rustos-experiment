@@ -26,6 +26,6 @@ impl<Fut: Future, F, B: Send> Future for Map<Fut, F> where F: FnOnce(Fut::Item) 
 
     fn then<G>(self, g: G) where G: FnOnce(<Self as Future>::Item) + Send {
         let Map{future, f} = self;
-        future.then(move |b| g(f(b)))
+        future.then(move |item| g(f(item)))
     }
 }
