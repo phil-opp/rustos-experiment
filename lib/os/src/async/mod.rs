@@ -1,10 +1,12 @@
-pub use self::future::{Future, FutureExt, Computation};
+pub use self::future::{Future, FutureExt};
+pub use self::computation::Computation;
 //pub use self::future_stream::Stream;
 pub use self::stream::Stream;
 
 pub use core_local::task_queue;
 
 mod future;
+mod computation;
 //mod future_stream;
 mod stream;
 mod spsc_queue;
