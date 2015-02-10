@@ -4,8 +4,8 @@ name = "std"
 version = "0.0.1"
 authors = ["Philipp Oppermann <dev@phil-opp.com>"]
 
-[dependencies]
-rlibc = "*"
+[dependencies.rlibc]
+git = "https://github.com/rust-lang/rlibc.git"
 
 [dependencies.alloc]
 path = "../liballoc"

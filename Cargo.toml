@@ -17,7 +17,7 @@ path = "lib/scheduler"
 [target.x86_64-unknown-linux-gnu.dependencies.frame_stack]
 path = "arch/x86_64/frame_stack"
 
-[dependencies.spinlock]
+[dependencies.spin]
 git = "https://github.com/phil-opp/spinlock-rs.git"
 branch = "try_lock"
 

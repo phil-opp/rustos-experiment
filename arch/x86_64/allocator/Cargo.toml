@@ -5,7 +5,8 @@ version = "0.0.1"
 authors = ["Philipp Oppermann <dev@phil-opp.com>"]
 
 [dependencies.bitflags]
-git = "https://github.com/rust-lang/bitflags"
+git = "https://github.com/phil-opp/bitflags.git"
+branch = "no_std"
 
 [dependencies.frame_stack]
 path = "../frame_stack"
