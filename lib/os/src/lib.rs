@@ -1,4 +1,5 @@
 #![feature(unsafe_destructor, box_syntax)]
+#![allow(dead_code)]
 
 extern crate core_local;
 pub mod async;
