@@ -1,5 +1,6 @@
 #![no_std]
 #![allow(dead_code)]
+#![feature(no_std)]
 
 #[macro_use]
 extern crate core;

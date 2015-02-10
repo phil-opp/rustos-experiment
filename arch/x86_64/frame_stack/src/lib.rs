@@ -1,13 +1,14 @@
 #![no_std]
 #![feature(globs)]
+#![feature(no_std)]
 
 extern crate core;
-extern crate spinlock;
+extern crate spin;
 
 use core::prelude::*;
 use core::intrinsics::{offset, size_of};
 use core::cmp::Ordering;
-use spinlock::Spinlock;
+use spin::Mutex;
 
 pub struct Frame {
     pub number: u32,
@@ -26,7 +27,7 @@ impl PartialOrd for Frame {
     }
 }
 
-const STACK_POINTER : *mut Spinlock<FrameStack> = 0o_001_000_000_0000 as *mut Spinlock<FrameStack>; //10MB
+const STACK_POINTER : *mut Mutex<FrameStack> = 0o_001_000_000_0000 as *mut Mutex<FrameStack>; //10MB
 
 struct FrameStack {
     first: *const Frame,
@@ -34,8 +35,8 @@ struct FrameStack {
 }
 
 pub unsafe fn init() {
-    (*STACK_POINTER) = Spinlock::new(FrameStack {
-        first: offset(STACK_POINTER as *const Spinlock<FrameStack>, 1) as *const Frame, 
+    (*STACK_POINTER) = Mutex::new(FrameStack {
+        first: offset(STACK_POINTER as *const Mutex<FrameStack>, 1) as *const Frame, 
         length: 0,
     });
 }
