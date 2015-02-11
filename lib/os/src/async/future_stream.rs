@@ -1,91 +1,68 @@
 use std::mem;
-use std::ptr::Unique;
-use std::sync::atomic::{AtomicBool, Ordering};
-use super::spsc_queue::Queue;
-use core_local::task_queue::{self, Thunk};
-use async;
-use async::future::{Future, FutureSetter};
+use async::stream::{Stream, StreamSender, Subscriber};
+use async::future::{Future, FutureExt};
+use async::computation::{self, Computation, ComputationResultSetter};
 
-pub struct Stream<T: Send> {
-    foreach_setter: FutureSetter<MutThunk<T>>,
+pub struct FutureStream<T> {
+    subscriber_setter: ComputationResultSetter<Box<Subscriber<Item=T>>>,
 }
 
-pub struct StreamSender<T: Send> {
-    foreach: Future<MutThunk<T>>,
+pub struct FutureStreamSender<T> {
+    subscriber: Computation<Box<Subscriber<Item=T>>>,
 }
 
-impl<T: Send> Stream<T> {
-    pub fn new() -> (Stream<T>, StreamSender<T>) {
-        let (future, setter) = Future::new();
-        let stream = Stream {
-            foreach_setter: setter,
+impl<T> FutureStream<T> where T: Send {
+    pub fn new() -> (FutureStream<T>, FutureStreamSender<T>) {
+        let (future, setter) = computation::new_pair();
+        let stream = FutureStream {
+            subscriber_setter: setter,
         };
-        let stream_sender = StreamSender {
-            foreach: future,
+        let sender = FutureStreamSender {
+            subscriber: future,
         };
-        (stream, stream_sender)
-    }
-
-    pub fn foreach<F>(self, f: F) where F: FnMut(T) + Send {
-        self.foreach_setter.set(MutThunk::with_arg(f))
-    }
-
-    pub fn map<F, V>(self, mut f: F) -> Stream<V> where F: FnMut(T)->V + Send, V: Send {
-        let (stream, mut sender) = Stream::new();
-        self.foreach(move |value| sender.send(f(value)));
-        stream
+        (stream, sender)
     }
 }
 
-impl<T: Send> StreamSender<T> {
-    pub fn send(&mut self, value: T) {
+impl<T> Stream for FutureStream<T> where T: Send {
+    type Item = T;
+
+    fn subscribe<S>(self, subscriber: S) where S: Subscriber<Item=T> {
+        self.subscriber_setter.set(Box::new(subscriber));
+    }
+}
+
+impl<T> StreamSender for FutureStreamSender<T> where T: Send {
+    type Item = T;
+
+    fn send(&mut self, value: T) {
+        // avoid `cannot move out of borrowed context`
         let mut tmp = unsafe{mem::uninitialized()};
-        mem::swap(&mut self.foreach, &mut tmp);
+        mem::swap(&mut self.subscriber, &mut tmp);
 
-        tmp = tmp.then(|mut f| {
-            f.invoke(value);
-            f
-        });
+        tmp = tmp.then_map(|mut subscriber| {
+            subscriber.on_value(value);
+            subscriber
+            });
 
-        tmp = mem::replace(&mut self.foreach, tmp);
+        mem::swap(&mut self.subscriber, &mut tmp);
         unsafe{mem::forget(tmp)};
     }
-}
 
-struct MutThunk<A=(),R=()> {
-    invoke: Box<Invoke<A,R>+Send>
-}
-
-impl<R> MutThunk<(),R> {
-    fn new<F>(mut func: F) -> MutThunk<(),R>
-        where F : FnMut() -> R, F : Send
-    {
-        MutThunk::with_arg(move|&mut: ()| func())
+    fn close(self) {
+        drop(self)
     }
 }
 
-impl<A,R> MutThunk<A,R> {
-    fn with_arg<F>(func: F) -> MutThunk<A,R>
-        where F : FnMut(A) -> R, F : Send
-    {
-        MutThunk {
-            invoke: Box::new(func)
-        }
-    }
-
-    fn invoke(&mut self, arg: A) -> R {
-        self.invoke.invoke(arg)
+#[unsafe_destructor]
+impl<T> Drop for FutureStreamSender<T> {
+    fn drop(&mut self) {
+        let dummy = Box::new(Dummy);
+        let s = mem::replace(&mut self.subscriber, Computation::from_value(dummy));
+        s.then(|subscriber| subscriber.on_close())
     }
 }
-
-trait Invoke<A=(),R=()> {
-    fn invoke(&mut self, arg: A) -> R;
-}
-
-impl<A,R,F> Invoke<A,R> for F
-    where F : FnMut(A) -> R
-{
-    fn invoke(&mut self, arg: A) -> R {
-        self(arg)
-    }
+struct Dummy<T>;
+impl<T> Subscriber for Dummy<T> {
+    type Item = T;
 }
