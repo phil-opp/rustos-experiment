@@ -19,9 +19,9 @@ pub trait StreamSender {
 pub trait Subscriber: Send {
     type Item;
 
-    fn on_value(&mut self, value: Self::Item);
+    fn on_value(&mut self, value: Self::Item) {}
 
-    fn on_close(self: Box<Self>);
+    fn on_close(self: Box<Self>) {}
 }
 
 pub trait StreamExt: Stream + Sized {
@@ -35,6 +35,10 @@ pub trait StreamExt: Stream + Sized {
         F: FnMut(B, Self::Item) -> B + Send,
     {
         FoldFuture::new(self, init, f)
+    }
+
+    fn foreach<F>(self, f: F) where F: FnMut(Self::Item) + Send {
+        self.subscribe(ForeachSubscriber{f: f})
     }
 }
 
@@ -138,5 +142,17 @@ impl<I, B, F> Subscriber for FoldSubscriber<I, B, F> where B: Send,
     fn on_close(self: Box<Self>) {
         let s = *self;
         s.future_setter.set(s.accumulator)
+    }
+}
+
+struct ForeachSubscriber<I, F> {
+    f: F,
+}
+
+impl<I, F> Subscriber for ForeachSubscriber<I, F> where F: FnMut(I) + Send {
+    type Item = I;
+
+    fn on_value(&mut self, value: I) {
+        (self.f)(value)
     }
 }
