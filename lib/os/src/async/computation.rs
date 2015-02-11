@@ -31,6 +31,12 @@ impl<T: Send> Computation<T> {
         assert!(task_queue::add(task).is_ok());
         future
     }
+
+    pub fn from_value(value: T) -> Computation<T> {
+        let (future, setter) = ComputationInner::new();
+        setter.set(value);
+        future
+    }
 }
 
 impl<T: Send> Future for Computation<T> {
