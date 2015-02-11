@@ -1,4 +1,6 @@
+use std::mem;
 use async::Future;
+use async::computation::{self, Computation, ComputationResultSetter};
 
 pub trait Stream {
     type Item: Send;
@@ -21,16 +23,14 @@ pub trait StreamExt: Stream + Sized {
         Map{stream: self, f: f}
     }
 
-    /*
-    fn fold<B, F>(self, init: B, f: F) -> Fold<Self, F> where
-        F: FnMut(B, Self::Item) -> B,
+    fn fold<B, F>(self, init: B, f: F) -> FoldFuture<Self, B, F> where B: Send, 
+        F: FnMut(B, Self::Item) -> B + Send,
     {
-        Fold{stream: self, accumulator: init, f: f}
-    }*/
+        FoldFuture::new(self, init, f)
+    }
 }
 
 impl<Strm> StreamExt for Strm where Strm: Stream {}
-
 
 #[must_use = "stream adaptors are lazy and do nothing unless consumed"]
 pub struct Map<Strm, F> {
@@ -74,22 +74,63 @@ impl<I, F, S> Subscriber for MapSubscriber<I, F, S> where
     }
 }
 
-/*
 #[must_use = "stream adaptors are lazy and do nothing unless consumed"]
-pub struct Fold<S, F> {
-    stream: S,
-    f: F,
+pub struct FoldFuture<Strm, B, F> where B: Send, Strm: Stream {
+    stream: Strm,
+    future: Computation<B>,
+    subscriber: FoldSubscriber<<Strm as Stream>::Item, B, F>
 }
 
-impl<S: Stream, F, B: Send> Future for Fold<S, B, F> where F: FnMut(B, Self::Item) + Send {
-    type Item = B;
-
-    fn then<G>(self, g: G) where G: FnOnce(Self::Item) + Send {
-        stream.on_value(move |item| )
+impl<Strm, B, F> FoldFuture<Strm, B, F> where Strm: Stream, B: Send, 
+    F: FnMut(B, <Strm as Stream>::Item) -> B + Send    
+{
+    fn new(stream: Strm, init: B, f: F) -> FoldFuture<Strm, B, F> {
+        let (future, setter) = computation::new_pair();
+        FoldFuture {
+            stream: stream,
+            future: future,
+            subscriber: FoldSubscriber {
+                accumulator: init,
+                f: f,
+                future_setter: setter,
+            },
+        }
     }
 }
 
-struct FoldSubscriber<F, S, A> {
-    f: F
+impl<Strm, B, F> Future for FoldFuture<Strm, B, F> where Strm: Stream + Send, B: Send, 
+    F: FnMut(B, <Strm as Stream>::Item) -> B + Send 
+{
+    type Item = B;
+
+    fn then<G>(self, g: G) where G: FnOnce(B) + Send {
+        let FoldFuture{stream, future, subscriber} = self;
+        future.then(g);
+        stream.subscribe(subscriber);
+    }
 }
-*/
+
+struct FoldSubscriber<I, B, F> where B: Send {
+    accumulator: B,
+    f: F,
+    future_setter: ComputationResultSetter<B>,
+}
+
+impl<I, B, F> Subscriber for FoldSubscriber<I, B, F> where B: Send,
+    F: FnMut(B, I) -> B + Send
+{
+    type Item = I;
+
+    fn on_value(&mut self, value: I) {
+        // avoid `cannot move out of borrowed context`
+        let mut tmp = unsafe{mem::uninitialized()};
+        mem::swap(&mut self.accumulator, &mut tmp);
+        tmp = (self.f)(tmp, value);
+        mem::swap(&mut self.accumulator, &mut tmp);
+        unsafe{mem::forget(tmp)};
+    }
+
+    fn on_end(self) {
+        self.future_setter.set(self.accumulator)
+    }
+}

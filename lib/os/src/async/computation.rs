@@ -8,7 +8,7 @@ pub struct Computation<T: Send> {
     inner: ComputationInnerPointer<T>,
 }
 
-struct ComputationResultSetter<T: Send> {
+pub struct ComputationResultSetter<T: Send> {
     inner: ComputationInnerPointer<T>,    
 }
 
@@ -18,6 +18,10 @@ struct ComputationInner<T: Send> {
     counterpart_finished: AtomicBool,
     value: Option<T>,
     then: Option<Thunk<T,()>>,    
+}
+
+pub fn new_pair<T: Send>() -> (Computation<T>, ComputationResultSetter<T>) {
+    ComputationInner::new()
 }
 
 impl<T: Send> Computation<T> {
@@ -38,7 +42,7 @@ impl<T: Send> Future for Computation<T> {
 }
 
 impl<T: Send> ComputationResultSetter<T> {
-    fn set(self, value: T) {
+    pub fn set(self, value: T) {
         unsafe{self.inner.set_value(value)}
     }
 }
