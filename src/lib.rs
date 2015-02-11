@@ -1,13 +1,14 @@
 #![feature(asm, lang_items, unboxed_closures)]
+#![feature(core)]
 
-extern crate spinlock;
+extern crate spin;
 extern crate scheduler;
 extern crate core_local;
 extern crate os;
 
 use scheduler::StackPointer;
-use core_local::task_queue;
-use os::async;
+//use core_local::task_queue
+use os::async::{self, Future, FutureExt, StreamSender, StreamExt};
 
 mod multiboot;
 mod init;
@@ -56,45 +57,25 @@ pub fn main(multiboot: *const multiboot::Information) {
     scheduler::spawn(|| test("6"));
     */
 
-    let a = async::run(|| {
+    async::run(|| {
+        print!("1 ");
         for _ in 0..100000 {}
         42
-    });
-
-    let b = a.then(|a| a/2);
-    let c = b.then(|b| b-10);
-    let d = c.then(|c| println!("c: {}", c));
+    }).map(|a| a/2).map(|b| b-10).map(|c| {println!("c: {}", c); c}).then(|_| {});
 
     async::run(|| {
+        print!("2 ");
         for i in 0u32..50 {
             //print!("{}:", i);
             async::run(move || i+1).then(|ii| {
+                for _ in 0u32..100000 {}
                 print!("{}.", ii);
             });
         }
     });
 
-    println!("abc");
 
-    async::run(|| {
-        let mut x = async::run(|| 1);
-        for i in 0u64..3000 {
-            x = x.then(move |x| {
-                //print!("{}.", x); 
-                (x+i)
-            });
-        }
-        x.then(|x| println!("\n\n\n\n{} == {}", x, 2999*3000/2+1));
-    });
-
-
-    fn work() {
-        if let Some(f) = core_local::task_queue::next() {
-            f.invoke(())
-        }
-    }
-
-    let (stream, mut sender) = async::Stream::new();
+    let (stream, mut sender) = async::FutureStream::new();
 
     let mut iuae = 0;
     let stream = stream.map(move |v: i32| {iuae += v*v; iuae}).map(|v: i32| match v {
@@ -107,15 +88,32 @@ pub fn main(multiboot: *const multiboot::Information) {
         let ret = (count, v);
         count += 1;
         ret
-    }).foreach(|v| print!("\n-->{:?}<-- ", v));
+    }).foreach(|v| println!("\n-->{:?}<-- ", v));
 
     sender.send(0);
     sender.send(1);
     sender.send(2);
     sender.send(3);
     sender.send(4);
+    sender.close();
+
+    let (stream, mut sender) = async::FutureStream::new();
+    for i in 0..10 {
+        sender.send(i);
+    }
+
+    stream.fold(0, |acc, v| acc + v).then(|v| println!("sum = {:?}", v));
+
+    drop(sender);
    
+    print!("work: ");
     
+    fn work() {
+        if let Some(f) = core_local::task_queue::next() {
+            f.invoke(())
+        }
+    }
+
     loop{
         work();
         //test("m");
