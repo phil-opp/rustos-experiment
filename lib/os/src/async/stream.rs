@@ -21,7 +21,7 @@ pub trait Subscriber: Send {
 
     fn on_value(&mut self, value: Self::Item);
 
-    fn on_close(self);
+    fn on_close(self: Box<Self>);
 }
 
 pub trait StreamExt: Stream + Sized {
@@ -53,18 +53,15 @@ impl<Strm, F, B: Send> Stream for Map<Strm, F> where
     type Item = B;
 
     fn subscribe<S>(self, subscriber: S) where S: Subscriber<Item=B> {
-        
-        fn test<T>(s: T) where T: Subscriber {}
         let Map{stream, mut f} = self;
-        //test(MapSubscriber{f: f, subscriber: subscriber});
-        stream.subscribe(MapSubscriber{f: f, subscriber: subscriber})
+        stream.subscribe(MapSubscriber{f: f, subscriber: Box::new(subscriber)})
     }
 }
 
 struct MapSubscriber<I, F, S>
 {
     f: F,
-    subscriber: S,
+    subscriber: Box<S>,
 }
 
 impl<I, F, S> Subscriber for MapSubscriber<I, F, S> where 
@@ -77,7 +74,7 @@ impl<I, F, S> Subscriber for MapSubscriber<I, F, S> where
         self.subscriber.on_value((self.f)(value))
     }
 
-    fn on_close(self) {
+    fn on_close(self: Box<Self>) {
         self.subscriber.on_close()
     }
 }
@@ -138,7 +135,8 @@ impl<I, B, F> Subscriber for FoldSubscriber<I, B, F> where B: Send,
         unsafe{mem::forget(tmp)};
     }
 
-    fn on_close(self) {
-        self.future_setter.set(self.accumulator)
+    fn on_close(self: Box<Self>) {
+        let s = *self;
+        s.future_setter.set(s.accumulator)
     }
 }
