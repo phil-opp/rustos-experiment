@@ -1,142 +1,112 @@
-use std::mem;
-use std::ptr::Unique;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::boxed;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicPtr, AtomicBool, Ordering};
+use std::ptr::{self, PtrExt, Unique};
+use async::{self, Stream, StreamSender, Subscriber};
 use super::spsc_queue::Queue;
-use core_local::task_queue::{self, Thunk};
-use async;
 
-pub struct Stream<T: Send> {
-    inner: StreamInnerPointer<T>,
+pub struct SpscStream<T> {
+    inner: Arc<SpscStreamInner<T>>,
 }
 
-pub struct StreamSender<T: Send> {
-    inner: StreamInnerPointer<T>,
-}
-
-pub struct StreamInnerPointer<T: Send>(Unique<StreamInner<T>>); 
-
-pub struct StreamInner<T: Send> {
-    queue: Queue<T>,
-    foreach: Option<MutThunk<T>>,
-    counterpart_finished: AtomicBool,
-}
-
-impl<T: Send> StreamInner<T> {
-    fn new() -> (Stream<T>, StreamSender<T>) {
-        let inner: StreamInner<T> = StreamInner {
+impl<T: Send> SpscStream<T> {
+    pub fn new() -> (SpscStream<T>, SpscStreamSender<T>) {
+        let inner = Arc::new(SpscStreamInner{
             queue: unsafe{Queue::new(0)},
-            foreach: None,
-            counterpart_finished: AtomicBool::new(false),
-        };
-        let inner_ptr = unsafe{mem::transmute(Box::new(inner))};
-        (Stream {
-            inner: StreamInnerPointer(Unique(inner_ptr)),
-        }, StreamSender{inner: StreamInnerPointer(Unique(inner_ptr))})
+            receiver: AtomicPtr::new(ptr::null_mut()),
+            closed: AtomicBool::new(false),
+        });
+        let stream = SpscStream{inner: inner.clone()};
+        let sender = SpscStreamSender{inner: inner};
+        (stream, sender)
     }
 }
 
-impl<T: Send> StreamInnerPointer<T> {
+impl<T: Send> Stream for SpscStream<T> {
+    type Item = T;
 
-    /// must only be called by StreamSender    
-    unsafe fn send(&mut self, value: T) {
-        if self.as_ref().counterpart_finished.load(Ordering::Relaxed) == true {
-            unimplemented!();
-        } else {
-            self.as_ref().queue.push(value)
-        }
+    fn subscribe<S>(self, subscriber: S) where S: Subscriber<Item=T> {
+        let receiver = Box::new(SpscStreamReceiver {
+                inner: self.inner.clone(),
+                subscriber: Box::new(subscriber),
+                running: AtomicBool::new(false),
+        });
+        unsafe{self.inner.set_receiver(receiver)}
+    }
+}
+
+pub struct SpscStreamSender<T> {
+    inner: Arc<SpscStreamInner<T>>,
+}
+
+impl<T: Send> StreamSender for SpscStreamSender<T> {
+    type Item = T;
+
+    fn send(&mut self, value: T) {
+        self.inner.queue.push(value);
+        self.inner.new_values();
     }
 
-    /// must only be called by StreamSender
-    unsafe fn close(self) {
-        if self.as_ref().counterpart_finished.compare_and_swap(false, true, Ordering::Relaxed) {
-            // receiver was dropped -> invoke remaining tasks
-            let mut inner: Box<StreamInner<T>> = mem::transmute(self);
-            if let Some(mut f) = inner.foreach.take() {
-                let task = Thunk::new(move || {
+    fn close(self) { /* drop */ }
+}
+
+#[unsafe_destructor]
+impl<T: Send> Drop for SpscStreamSender<T> {
+    fn drop(&mut self) {
+        self.inner.closed.store(true, Ordering::SeqCst);
+        self.inner.new_values();
+    }
+}
+
+struct SpscStreamReceiver<T> {
+    inner: Arc<SpscStreamInner<T>>,
+    running: AtomicBool,
+    subscriber: Box<Subscriber<Item=T>>,
+}
+
+unsafe impl<T: Send> Sync for SpscStreamReceiver<T> {}
+
+struct SpscStreamInner<T> {
+    queue: Queue<T>,
+    receiver: AtomicPtr<SpscStreamReceiver<T>>,
+    closed: AtomicBool,
+}
+
+impl<T: Send> SpscStreamInner<T> {
+    unsafe fn set_receiver(&self, receiver: Box<SpscStreamReceiver<T>>) {
+        self.receiver.store(boxed::into_raw(receiver), Ordering::SeqCst);
+    }
+
+    fn new_values(&self) {
+        if let Some(receiver) = unsafe{self.receiver.load(Ordering::SeqCst).as_mut()} {
+            // subscriber was set
+            if receiver.running.compare_and_swap(false, true, Ordering::SeqCst) == false {
+                // start receiver
+                async::run(move || {
+                    let SpscStreamReceiver{
+                        ref inner, ref mut subscriber, ref running,
+                    } = *receiver;
+
                     while let Some(value) = inner.queue.pop() {
-                        f.invoke(value)
+                        subscriber.on_value(value);
+                    }
+                    // mark receiver as not running
+                    running.store(false, Ordering::SeqCst);
+                    
+                    // maybe there was a send between last pop and running.store(false)
+                    // -> invoke new_values again
+                    if inner.queue.peek().is_some() {
+                        inner.new_values();
+                    } else if inner.closed.load(Ordering::SeqCst) {
+                        println!(" CLOSE ");
+                        // take receiver
+                        let ptr = inner.receiver.swap(ptr::null_mut(), Ordering::SeqCst);
+                        assert!(!ptr.is_null());
+                        let receiver = unsafe{Box::from_raw(ptr)};
+                        receiver.subscriber.on_close();
                     }
                 });
-                assert!(task_queue::add(task).is_ok());
             }
-        }
-    }
-
-    /// must only be called by Stream (Receiver)
-    unsafe fn set_foreach<F>(self, f: F) where F: FnMut(T) + Send {
-        let foreach = MutThunk::with_arg(f);
-        self.as_ref().foreach = Some(foreach);
-    }
-
-    unsafe fn as_ref(&self) -> &mut StreamInner<T> {
-        &mut *(self.0).0
-    }
-}
-
-impl<T: Send> Stream<T> {
-    pub fn new() -> (Stream<T>, StreamSender<T>) {
-        StreamInner::new()
-    }
-
-    pub fn foreach<F>(self, f: F) where F: FnMut(T) + Send {
-        unsafe{self.inner.set_foreach(f)}
-    }
-
-    pub fn map<F, V>(self, mut f: F) -> Stream<V> where F: FnMut(T)->V + Send, V: Send {
-        let (stream, mut sender) = StreamInner::new();
-        let foreach = move |value| sender.send(f(value));
-        self.foreach(foreach);
-        stream
-    }
-}
-
-impl<T: Send> StreamSender<T> {
-    pub fn send(&mut self, value: T) {
-        unsafe{self.inner.send(value)}
-    }
-
-    pub fn close(self) {
-        unsafe{self.inner.close()}
-    }
-}
-
-
-
-
-struct MutThunk<A=(),R=()> {
-    invoke: Box<Invoke<A,R>+Send>
-}
-
-impl<R> MutThunk<(),R> {
-    fn new<F>(mut func: F) -> MutThunk<(),R>
-        where F : FnMut() -> R, F : Send
-    {
-        MutThunk::with_arg(move |()| func())
-    }
-}
-
-impl<A,R> MutThunk<A,R> {
-    fn with_arg<F>(func: F) -> MutThunk<A,R>
-        where F : FnMut(A) -> R, F : Send
-    {
-        MutThunk {
-            invoke: Box::new(func)
-        }
-    }
-
-    fn invoke(&mut self, arg: A) -> R {
-        self.invoke.invoke(arg)
-    }
-}
-
-trait Invoke<A=(),R=()> {
-    fn invoke(&mut self, arg: A) -> R;
-}
-
-impl<A,R,F> Invoke<A,R> for F
-    where F : FnMut(A) -> R
-{
-    fn invoke(&mut self, arg: A) -> R {
-        self(arg)
+        }        
     }
 }
