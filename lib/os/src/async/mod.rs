@@ -1,7 +1,8 @@
 pub use self::future::{Future, FutureExt};
 pub use self::computation::Computation;
-pub use self::stream::{Stream, StreamSender, StreamExt};
+pub use self::stream::{Stream, StreamSender, Subscriber, StreamExt};
 pub use self::future_stream::FutureStream;
+pub use self::spsc_stream::SpscStream;
 //pub use self::spsc_stream::Stream;
 
 pub use core_local::task_queue;

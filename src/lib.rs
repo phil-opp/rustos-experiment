@@ -57,6 +57,7 @@ pub fn main(multiboot: *const multiboot::Information) {
     scheduler::spawn(|| test("6"));
     */
 
+/*
     async::run(|| {
         print!("1 ");
         for _ in 0..100000 {}
@@ -73,7 +74,7 @@ pub fn main(multiboot: *const multiboot::Information) {
             });
         }
     });
-
+*/
 
     let (stream, mut sender) = async::FutureStream::new();
 
@@ -88,7 +89,7 @@ pub fn main(multiboot: *const multiboot::Information) {
         let ret = (count, v);
         count += 1;
         ret
-    }).foreach(|v| println!("\n-->{:?}<-- ", v));
+    }).foreach(|v| println!("{:?} ", v));
 
     sender.send(0);
     sender.send(1);
@@ -105,8 +106,40 @@ pub fn main(multiboot: *const multiboot::Information) {
     stream.fold(0, |acc, v| acc + v).then(|v| println!("sum = {:?}", v));
 
     drop(sender);
+
+    //spsc stream
+    let (stream, mut sender) = async::SpscStream::new();
+
+    let mut iuae = 0;
+    let stream = stream.map(move |v: i32| {iuae += v*v; iuae}).map(|v: i32| match v {
+        v if v<0 => format!("negative: {}", v),
+        v if v==0 => format!("null: {}", v),
+        v => format!("positive: {}", v),
+    });
+    let mut count = 0;
+    stream.map(move |v| {
+        let ret = (count, v);
+        count += 1;
+        ret
+    }).foreach(|v| println!("{:?} ", v));
+
+    sender.send(0);
+    sender.send(1);
+    sender.send(2);
+    sender.send(3);
+    sender.send(4);
+    sender.close();
+
+    let (stream, mut sender) = async::SpscStream::new();
+    for i in 0..10 {
+        sender.send(i);
+    }
+
+    stream.fold(0, |acc, v| acc + v).then(|v| println!("sum = {:?}", v));
+
+    drop(sender);
    
-    print!("work: ");
+    //print!("work: ");
     
     fn work() {
         if let Some(f) = core_local::task_queue::next() {
