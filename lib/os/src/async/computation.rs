@@ -1,27 +1,13 @@
 use async::Future;
-use std::mem;
-use std::ptr::Unique;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use core_local::task_queue::{self, Thunk};
-
-pub struct Computation<T: Send> {
-    inner: ComputationInnerPointer<T>,
-}
-
-pub struct ComputationResultSetter<T: Send> {
-    inner: ComputationInnerPointer<T>,    
-}
-
-struct ComputationInnerPointer<T: Send>(Unique<ComputationInner<T>>);
-
-struct ComputationInner<T: Send> {
-    counterpart_finished: AtomicBool,
-    value: Option<T>,
-    then: Option<Thunk<T,()>>,    
-}
 
 pub fn new_pair<T: Send>() -> (Computation<T>, ComputationResultSetter<T>) {
     ComputationInner::new()
+}
+
+pub struct Computation<T: Send> {
+    inner: Arc<ComputationInner<T>>,
 }
 
 impl<T: Send> Computation<T> {
@@ -47,54 +33,53 @@ impl<T: Send> Future for Computation<T> {
     }
 }
 
+pub struct ComputationResultSetter<T: Send> {
+    inner: Arc<ComputationInner<T>>,    
+}
+
 impl<T: Send> ComputationResultSetter<T> {
     pub fn set(self, value: T) {
         unsafe{self.inner.set_value(value)}
     }
 }
 
-impl<T: Send> ComputationInnerPointer<T> {
-    unsafe fn set_then(self, then: Thunk<T,()>) {
-        self.as_ref().then = Some(then); // + implicitely invoke destructor
-    }    
-
-    unsafe fn set_value(self, value: T) {
-        self.as_ref().value = Some(value); // + implicitely invoke destructor
-    }
-
-    unsafe fn as_ref(&self) -> &mut ComputationInner<T> {
-        &mut *(self.0).0
-    }
-}
-
-#[unsafe_destructor]
-impl<T: Send> Drop for ComputationInnerPointer<T> {
-    fn drop(&mut self) {
-        unsafe{self.as_ref().invoke_if_set()}
-    }
+struct ComputationInner<T: Send> {
+    value: Option<T>,
+    then: Option<Thunk<T,()>>,    
 }
 
 impl<T: Send> ComputationInner<T> {
     fn new() -> (Computation<T>, ComputationResultSetter<T>) {
-        let inner = ComputationInner::<T> {
+        let inner = Arc::new(ComputationInner::<T> {
             value: None,
             then: None, 
-            counterpart_finished: AtomicBool::new(false),
-        };
-        let inner_ptr = unsafe{mem::transmute(Box::new(inner))};
-        let computation = Computation{inner: ComputationInnerPointer(Unique(inner_ptr))};
-        let setter = ComputationResultSetter{inner: ComputationInnerPointer(Unique(inner_ptr))};
+        });
+        let computation = Computation{inner: inner.clone()};
+        let setter = ComputationResultSetter{inner: inner};
         (computation, setter)
     }
 
-    unsafe fn invoke_if_set(&mut self) {
-        if self.counterpart_finished.compare_and_swap(false, true, Ordering::SeqCst) == true {
-            if let (Some(value), Some(then)) = (self.value.take(), self.then.take()) {
-                let task = Thunk::new(move || then.invoke(value));
-                assert!(task_queue::add(task).is_ok())
-            }
-            let inner: Box<ComputationInner<T>> = unsafe{mem::transmute(self as *mut _)};
-            drop(inner);
+    unsafe fn set_then(&self, then: Thunk<T,()>) {
+        (&mut *self.as_mut()).then = Some(then);
+    }    
+
+    unsafe fn set_value(&self, value: T) {
+        (&mut *self.as_mut()).value = Some(value);
+    }
+
+    fn as_mut(&self) -> *mut ComputationInner<T> {
+        self as *const _ as *mut _
+    }
+}
+
+unsafe impl<T: Send> Sync for ComputationInner<T> {} 
+
+#[unsafe_destructor]
+impl<T: Send> Drop for ComputationInner<T> {
+    fn drop(&mut self) {
+        if let (Some(value), Some(then)) = (self.value.take(), self.then.take()) {
+            let task = Thunk::new(move || then.invoke(value));
+            assert!(task_queue::add(task).is_ok())
         }
     }
 }
