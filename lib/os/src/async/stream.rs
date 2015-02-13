@@ -19,7 +19,7 @@ pub trait StreamSender {
 pub trait Subscriber: Send {
     type Item;
 
-    fn on_value(&mut self, value: Self::Item) {}
+    fn on_value(&mut self, _value: Self::Item) {}
 
     fn on_close(self: Box<Self>) {}
 }
@@ -57,7 +57,7 @@ impl<Strm, F, B: Send> Stream for Map<Strm, F> where
     type Item = B;
 
     fn subscribe<S>(self, subscriber: S) where S: Subscriber<Item=B> {
-        let Map{stream, mut f} = self;
+        let Map{stream, f} = self;
         stream.subscribe(MapSubscriber{f: f, subscriber: Box::new(subscriber)})
     }
 }

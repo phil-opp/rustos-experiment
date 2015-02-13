@@ -1,4 +1,5 @@
 #![feature(unsafe_destructor, box_syntax)]
+#![feature(core)]
 #![allow(dead_code)]
 
 extern crate core_local;
