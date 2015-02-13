@@ -1,4 +1,4 @@
-use async::computation::{self, Computation};
+use async::future_value::{self, FutureValue};
 
 pub trait Future: Send {
     type Item: Send;
@@ -13,10 +13,10 @@ pub trait FutureExt: Future + Sized {
         Map{future: self, f: f}
     }
 
-    fn then_map<F, B>(self, f: F) -> Computation<B> where
+    fn then_map<F, B>(self, f: F) -> FutureValue<B> where
         F: FnOnce(Self::Item) -> B + Send, B: Send,
     {
-        let (future, setter) = computation::new_pair();
+        let (future, setter) = future_value::new_pair();
         self.then(move |value| setter.set(f(value)));
         future
     }

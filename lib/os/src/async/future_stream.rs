@@ -1,19 +1,19 @@
 use std::mem;
 use async::stream::{Stream, StreamSender, Subscriber};
 use async::future::{Future, FutureExt};
-use async::computation::{self, Computation, ComputationResultSetter};
+use async::future_value::{self, FutureValue, FutureValueSetter};
 
 pub struct FutureStream<T> {
-    subscriber_setter: ComputationResultSetter<Box<Subscriber<Item=T>>>,
+    subscriber_setter: FutureValueSetter<Box<Subscriber<Item=T>>>,
 }
 
 pub struct FutureStreamSender<T> {
-    subscriber: Computation<Box<Subscriber<Item=T>>>,
+    subscriber: FutureValue<Box<Subscriber<Item=T>>>,
 }
 
 impl<T> FutureStream<T> where T: Send {
     pub fn new() -> (FutureStream<T>, FutureStreamSender<T>) {
-        let (future, setter) = computation::new_pair();
+        let (future, setter) = future_value::new_pair();
         let stream = FutureStream {
             subscriber_setter: setter,
         };
@@ -58,7 +58,7 @@ impl<T> StreamSender for FutureStreamSender<T> where T: Send {
 impl<T> Drop for FutureStreamSender<T> {
     fn drop(&mut self) {
         let dummy = Box::new(Dummy);
-        let s = mem::replace(&mut self.subscriber, Computation::from_value(dummy));
+        let s = mem::replace(&mut self.subscriber, FutureValue::from_value(dummy));
         s.then(|subscriber| subscriber.on_close())
     }
 }

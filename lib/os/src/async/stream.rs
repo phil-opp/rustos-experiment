@@ -1,6 +1,6 @@
 use std::mem;
 use async::Future;
-use async::computation::{self, Computation, ComputationResultSetter};
+use async::future_value::{self, FutureValue, FutureValueSetter};
 
 pub trait Stream {
     type Item: Send;
@@ -86,7 +86,7 @@ impl<I, F, S> Subscriber for MapSubscriber<I, F, S> where
 #[must_use = "stream adaptors are lazy and do nothing unless consumed"]
 pub struct FoldFuture<Strm, B, F> where B: Send, Strm: Stream {
     stream: Strm,
-    future: Computation<B>,
+    future: FutureValue<B>,
     subscriber: FoldSubscriber<<Strm as Stream>::Item, B, F>
 }
 
@@ -94,7 +94,7 @@ impl<Strm, B, F> FoldFuture<Strm, B, F> where Strm: Stream, B: Send,
     F: FnMut(B, <Strm as Stream>::Item) -> B + Send    
 {
     fn new(stream: Strm, init: B, f: F) -> FoldFuture<Strm, B, F> {
-        let (future, setter) = computation::new_pair();
+        let (future, setter) = future_value::new_pair();
         FoldFuture {
             stream: stream,
             future: future,
@@ -122,7 +122,7 @@ impl<Strm, B, F> Future for FoldFuture<Strm, B, F> where Strm: Stream + Send, B:
 struct FoldSubscriber<I, B, F> where B: Send {
     accumulator: B,
     f: F,
-    future_setter: ComputationResultSetter<B>,
+    future_setter: FutureValueSetter<B>,
 }
 
 impl<I, B, F> Subscriber for FoldSubscriber<I, B, F> where B: Send,
